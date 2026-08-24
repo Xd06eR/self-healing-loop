@@ -1,0 +1,23 @@
+guardrails/state/
+# incident_memory/log.jsonl MUST be tracked — it is the cross-run "gets better"
+# store; on an ephemeral runner an untracked log resets every cycle and the loop
+# never learns. Ignore everything else under the dir, keep the log.
+incident_memory/*
+!incident_memory/log.jsonl
+# Loop intermediates (N6): raw agent output may carry log-sourced client data —
+# never commit them. Patterns are RELATIVE to this file's dir, which is the dir
+# the intermediates are written to (the repo root here, `.shl/`
+# once vendored) — so a bare `*.json` is correct; a `.shl/`-
+# prefixed pattern would look one level too deep and leak. `*.json` does not
+# match the tracked `log.jsonl` (different extension).
+*.json
+# The OpenCode harness config is part of the install, not an intermediate: it
+# carries the per-role permission blocks, and a target where it is missing has
+# no restriction to select. Named explicitly so the blanket rule above keeps
+# covering everything an agent writes.
+!opencode.json
+*.txt
+*.diff
+*.raw
+__pycache__/
+*.pyc

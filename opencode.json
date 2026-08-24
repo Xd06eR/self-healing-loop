@@ -1,0 +1,44 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "agent": {
+    "shl-diagnose": {
+      "description": "Self-healing loop: read-only diagnosis of a failure.",
+      "mode": "primary",
+      "permission": {
+        "*": "deny",
+        "read": "allow",
+        "glob": "allow",
+        "grep": "allow",
+        "external_directory": "allow"
+      }
+    },
+    "shl-review": {
+      "description": "Self-healing loop: read-only review of a proposed fix.",
+      "mode": "primary",
+      "permission": {
+        "*": "deny",
+        "read": "allow",
+        "glob": "allow",
+        "grep": "allow",
+        "external_directory": "allow"
+      }
+    },
+    "shl-fix": {
+      "description": "Self-healing loop: edits the target's source, runs nothing.",
+      "mode": "primary",
+      "permission": {
+        "*": "deny",
+        "read": "allow",
+        "glob": "allow",
+        "grep": "allow",
+        "external_directory": "allow",
+        "edit": {
+          "*": "allow",
+          "**/.shl/**": "deny",
+          "**/.gitattributes": "deny",
+          "**/.git/**": "deny"
+        }
+      }
+    }
+  }
+}

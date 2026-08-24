@@ -1,0 +1,144 @@
+# Reference workflow — copied into a target repo's .github/workflows/ at install.
+# Cron-driven watch: read+compact the target log; dispatch heal on a failure signal.
+#
+# Repo vars/secrets this needs (set per target):
+#   SHL_ADAPTER                                                      (var)
+#   SHL_LOG_TOKEN     (secret: only when the log source is the host's, not the repo's)
+#   SHL_SETUP_CMD           (var: installs the TARGET's own deps — whatever a clean checkout runs
+#                            before its tests work, e.g. "npm ci", "pip install -r requirements.txt",
+#                            "bundle install", "go mod download". Empty only if the target needs
+#                            none. heal.yml uses it too.)
+name: sh-watch
+on:
+  # SHIPS DISABLED, DELIBERATELY. The loop merges to the default branch
+  # unattended, so it must not start on its own the moment it is installed.
+  # Uncomment the `schedule` block below only after the operator has validated
+  # on the install branch (`gh workflow run watch.yml --ref self-healing-loop-install`),
+  # including the must-pass case (a test-weakening fix is BLOCKED), and has read
+  # any test suite the installer generated — that suite is what the gate rests
+  # on. Until then, trigger by hand.
+  #
+  # Cadence is bounded by the LOG SOURCE's retention, not by taste. A log the
+  # project writes to disk does not expire, so a few hours is fine. A HOSTED
+  # log source does expire, and the shortest retention tiers are measured in
+  # hours — poll slower than that and most failures age out unseen, so the
+  # loop idles and looks healthy while the evidence disappears. Take the
+  # retention from the platform's own docs (it is recorded in SETUP.md as a
+  # decision) and set the interval well inside it. Scheduled runs are also
+  # delayed under load, so leave real headroom and have read_log query a
+  # FIXED window wider than the interval, and let fingerprint dedup absorb the
+  # overlap. Do NOT derive the window from the last run's timestamp: that
+  # shells out to `gh`, and the step calling read_log withholds GH_TOKEN on
+  # purpose, because it parses an untrusted log. The call raises and takes the
+  # whole watch down on every tick, which reads as a healthy quiet project.
+  #
+  # schedule:
+  #   - cron: "0 */3 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  # `actions: write` is for the `gh workflow run` dispatch below, and nothing
+  # else here writes to GitHub — the step that runs loop.py holds no GH_TOKEN
+  # at all, so an adapter could not authenticate a call even if it made one.
+  actions: write
+
+# Every step that scrubs needs the operator's client-name patterns, and that is
+# most of them: issue bodies, PR text, the fix diff, suite output and each
+# role's raw output all pass through `guardrails.cli scrub`. Set at workflow
+# level so a new scrub call cannot be added without it. Unset is ordinary — the
+# built-in secret and PII shapes still apply.
+env:
+  SHL_EXTRA_SCRUB_PATTERNS: ${{ vars.SHL_EXTRA_SCRUB_PATTERNS }}
+
+# One cycle at a time per branch, ACROSS both workflows — this group name is
+# shared with heal.yml on purpose. Watch dispatches heal, so a watch that runs
+# while a heal is mid-cycle is not merely wasteful: the log still shows the
+# unfixed failure, so it dispatches a SECOND cycle onto the same issue and the
+# same repro path, both reading the attempt cap from issue comments.
+#
+# Keyed by ref because a cycle is branch-scoped, so a self-test on the install
+# branch and production on the default branch do not block each other.
+#
+# cancel-in-progress stays FALSE: queueing is safe, cancelling is not. A heal
+# killed between `git revert` and its push leaves the bad fix live with no
+# escalation and no incident recorded.
+concurrency:
+  group: self-healing-loop-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    # Reads and compacts a log; runs no agent. Generous for a slow hosted log
+    # API, and far under GitHub's six-hour default.
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      # Needed here too: read_log runs the target adapter, which for a
+      # deployment-site log source imports that platform's SDK (boto3, sentry_sdk,
+      # a cloud CLI). Without the target's deps the watch crashes and the cron
+      # never dispatches a heal.
+      # Through env, for the same reason as heal.yml's copy: substituted into
+      # `run:` the value becomes the step's SYNTAX, so an unbalanced quote is
+      # an unparseable step rather than a command that fails.
+      - name: Install target dependencies
+        if: vars.SHL_SETUP_CMD != ''
+        env:
+          SETUP_CMD: ${{ vars.SHL_SETUP_CMD }}
+        run: eval "$SETUP_CMD"
+      - name: Read log + compact
+        id: watch
+        working-directory: .shl
+        env:
+          SHL_ADAPTER: ${{ vars.SHL_ADAPTER }}
+          # The whole variable set, so an adapter can read a name this template
+          # has never heard of — a project id, a region, an org. Per-variable
+          # `env:` lines fail two ways: a name nobody wired is absent at runtime
+          # while correctly set in the repo, so read_log raises every tick, and
+          # re-vendoring drops any line an installer added by hand. Both are
+          # silent. `adapters.hydrate_repo_vars` folds this into os.environ
+          # without overriding anything set explicitly above. Carries no
+          # secrets: `secrets.*` is a separate context toJSON(vars) cannot read,
+          # which is what keeps this compatible with the withheld token below.
+          SHL_VARS: ${{ toJSON(vars) }}
+          # NO SHL_AUTH_TOKEN here, deliberately. `loop.py watch` runs no agent
+          # (the agent is constructed lazily precisely so this step can withhold
+          # it), and read_log MAY execute agent-authored code: on a target whose
+          # failure signal is "the suite went red", read_log runs previously
+          # merged repro tests, which were authored from untrusted logs. The
+          # provider key must not be in that environment.
+          #
+          # The log-source credential below is a different thing: it belongs to
+          # the adapter's own code, not to any agent. An adapter that reads a
+          # HOST log must not also run the suite in the same read_log — see
+          # reference/closing-gaps.md, "The credential trap".
+          SHL_LOG_TOKEN: ${{ secrets.SHL_LOG_TOKEN }}
+        run: |
+          signal="$(python -B loop.py watch)"
+          if [ "$signal" = "IDLE" ]; then
+            echo "signal=false" >> "$GITHUB_OUTPUT"
+            echo "idle — nothing to heal"
+          else
+            printf '%s' "$signal" > signal.txt
+            # Refuse a failure this compactor cannot fingerprint, BEFORE
+            # dispatching. heal.yml checks the same thing, but only after
+            # Diagnose has run — so on a stack whose frames do not parse, every
+            # tick would spend an agent call and then stop. Checked here it
+            # spends nothing, and the job fails saying which part is missing.
+            #
+            # And before the output is written, so the refusal is what stops the
+            # dispatch rather than GitHub's implicit success() on the step.
+            python -B loop.py fingerprint-marker signal.txt > /dev/null
+            echo "signal=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Dispatch heal
+        if: success() && steps.watch.outputs.signal == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # --ref propagates the branch: a self-test dispatched against a side
+        # branch must heal THAT branch, not silently jump to the default one.
+        run: gh workflow run heal.yml --ref "${{ github.ref_name }}"
