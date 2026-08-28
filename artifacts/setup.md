@@ -32,7 +32,7 @@ If the answer was *generated*, the gate now rests on tests an agent wrote from a
 
 **Choice:** `{{LOG_SURFACE}}`
 
-Options were: a log on disk · the host's logs · the visitor's browser only · CI only.
+Options were: a log on disk · the host's logs · CI only · nowhere readable yet, because they are client-side.
 
 This is the decision most worth re-reading. Getting it wrong does not break anything visibly: the loop reads the wrong place, finds nothing, and idles, which is indistinguishable from a healthy project.
 
@@ -40,7 +40,7 @@ This is the decision most worth re-reading. Getting it wrong does not break anyt
 
 **Choice:** `{{BROWSER_FIX}}`
 
-Options were: generate a relay endpoint · adopt an error tracker · accept regression-only healing. This decision is only reached when decision 2 was "the visitor's browser only", so `n/a` above means it was never live rather than never answered.
+Options were: generate a relay endpoint · adopt an error tracker · accept regression-only healing. This decision is only reached when decision 2 was *nowhere readable yet, because they are client-side*, so `n/a` above means it was never live rather than never answered.
 
 If a relay was generated, this repo now serves a public, unauthenticated endpoint that writes into the loop's own input. It is hardened, and it is still product code that was not here before.
 
@@ -267,7 +267,11 @@ gh workflow run watch.yml --ref self-healing-loop-install
 ```
 
 - [ ] Seed one small, self-contained defect plus a test that fails on it, on the install branch. Put it where this project's log surface will actually record it — a failure nothing logs does not exist to the loop, and the loop will idle looking healthy.
-- [ ] **Make it fail like an error, and confirm the log holds it.** Compaction keeps only lines carrying error vocabulary and a trace, so a defect that logs a plain sentence is discarded, the watch reports IDLE, and it reads as a broken loop rather than a badly-shaped probe. Run `read_log()` and see the failure in its output before spending a dispatch.
+- [ ] **Make it fail like an error, and confirm the log holds it.** Compaction keeps only lines carrying error vocabulary and a trace, so a defect that logs a plain sentence is discarded, the watch reports IDLE, and it reads as a broken loop rather than a badly-shaped probe. Print what the adapter actually sees before spending a dispatch — supply `SHL_LOG_TOKEN` inline for the one call on a hosted source:
+
+  ```bash
+  cd .shl && PYTHONPATH=. python3 -B -c "from adapters import load_adapter; print(load_adapter().read_log())"
+  ```
 - [ ] Dispatch the watch as above (or *Actions → sh-watch → Run workflow*, selecting that branch). Confirm the whole chain: issue filed, reproducing test written and RED, fix applied, gate green, PR opened, review passed, merge, deploy if configured, verify, incident recorded.
 - [ ] **Must-pass: prove the gate BLOCKS a weakened test.** There is no way to inject a fix into a cycle — the agent authors it — so run the gate against a weakened diff directly. Delete an assertion from any test file, then:
 
