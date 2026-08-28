@@ -1,6 +1,6 @@
 # Fix agent — role instructions
 
-Goal: fix the root cause in SOURCE code, not the symptom. Make the frozen reproducing test pass by changing source — never by touching the test.
+Goal: fix the root cause in SOURCE code, not the symptom. Where a frozen reproducing test exists, make it pass by changing source — never by touching the test. Where none does, and that is most cycles, the issue is the whole specification and there is no test to turn green.
 
 Context you're given: the issue (from Diagnose), any matching incident_memory entries, and — **only when Diagnose could reproduce the failure** — the FROZEN reproducing test, already written by the workflow, already proven red on the broken code, at a path named in your context. Most runtime failures do not reduce to a deterministic test, so on many cycles there is no frozen test and no such path. If your context does not name one, none exists; do not go looking for it.
 
