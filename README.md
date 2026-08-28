@@ -2,15 +2,15 @@
 
 A framework that installs a fully autonomous self-healing CI/CD loop into a project's own GitHub repo. It watches logs for failures and, for each one, files an issue, writes a fix, tests it, opens and reviews a PR, merges, deploys, and verifies — with no human in the happy path. A harness is config rather than framework code, and the model behind it is a repo variable. Two harnesses ship: Claude Code and OpenCode.
 
-> **Status: experimental, and the distinction below is the honest one.**
+> **Status: experimental. The split below is final — no further runner testing is planned.**
 >
-> **Demonstrated on a real GitHub Actions runner, against a real failure:** reading a host's logs, deciding idle versus dispatch, diagnosing the root cause, writing a reproducing test and proving it red, fixing the source, passing the deterministic gate, and opening a pull request. The fix produced was byte-identical to the one a person would have written.
+> **Ran on a real GitHub Actions runner, against real failures:** reading a host's logs, deciding idle versus dispatch, diagnosing a root cause from a fully minified stack, writing a reproducing test and proving it red, and fixing the source. One run went further, through the gate to an open pull request. Both fixes were byte-identical to what a person would have written.
 >
-> **Never yet completed on a runner:** everything after the review — merge, deploy, post-deploy verification, automatic rollback, and the incident record. Each is reachable only when the step before it succeeds, and no cycle has got that far.
+> **Those runs predate the code in this tree**, and that qualifier is the important one. The gate, the guardrail CLI and the heal workflow were substantially rewritten afterwards. What the runs evidence is the design; they are not evidence about this implementation.
 >
-> **Covered by tests but not by a live run:** the gate refusing a bad fix, the attempt cap, and OpenCode as a harness.
+> **Never completed on a runner:** everything from the merge onward — merge, deploy, post-deploy verification, automatic rollback, the incident record — plus the gate actually refusing a bad fix, the attempt cap, the escalation path, and OpenCode as a harness. The first group is reachable only when the step before it succeeds, and no cycle has got that far.
 >
-> Treat every claim in this README against that split. Nothing here has been proven by a cycle completing, because none has.
+> **So the evidence is unit tests, workflow linting, and two partial runs against older code.** No cycle has ever completed. Treat every claim below against that.
 
 > **Risks to accept before installing.** Properties of the design and of its maturity, not defects awaiting a fix.
 >
