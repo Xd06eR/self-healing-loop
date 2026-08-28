@@ -87,7 +87,7 @@ def validate_contract(role: AgentRole, payload: dict) -> None:
         # injected path in the payload is inert rather than filtered. A regex
         # here could only encode one language's convention — a pytest-shaped
         # `^tests/test_[A-Za-z0-9_]+\.py$` fails validation on every non-Python
-        # target, so no cycle completes. Guarded by tests/test_workflows.py.
+        # target, so no cycle completes.
     # `approved` decides whether agent-written code reaches the default branch,
     # and the workflow reads it with `jq -e`, which exits 0 for everything that
     # is not JSON `false` or `null` — so `"false"`, `"no"`, `0`, `""` and `[]`

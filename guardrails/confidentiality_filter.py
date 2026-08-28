@@ -51,8 +51,8 @@ _DEFAULT_PATTERNS: list[tuple[str, re.Pattern]] = [
 # exclusion from `adapters.hydrate_repo_vars`, so a credential an operator
 # stored as a plaintext repo variable is not folded into the environment of
 # every adapter-loading step. A name missing from this tuple fails both, and
-# `tests/test_confidentiality_filter.py` derives the expected set from the
-# workflow templates rather than restating it.
+# the framework's own suite derives the expected set from the workflow
+# templates rather than restating it.
 SECRET_ENV_VARS = (
     "SHL_AUTH_TOKEN",
     "SHL_LOG_TOKEN",

@@ -88,7 +88,7 @@ _DEFAULT_TEST_CONFIG_GLOBS = (
     # Widening the built-in was the right direction rather than narrowing the
     # prose: the prose describes the category correctly, and `package.json` had
     # already settled that a dependency manifest counts.
-    # `tests/test_prompt_contract.py` pins the two lists together.
+    # The framework's own suite pins this list and the prose together.
     ".rspec",
     "Rakefile",
     "Cargo.toml",

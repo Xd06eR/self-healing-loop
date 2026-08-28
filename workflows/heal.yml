@@ -59,11 +59,6 @@
 #                    jest's "*__tests__/*"; without it those files are invisible
 #                    to the gate's no-weakening check.)
 #
-# VERIFICATION STATUS: structurally tested, never run on a runner.
-# tests/test_workflows.py pins step order, secret discipline, branch scoping,
-# the CLI invocation form, the shell semantics of each step, and the run bounds
-# (job timeout + one cycle at a time per branch), and lints both files with
-# actionlint. No claim here covers a real cycle executing.
 # Reference template; the installer adapts it.
 name: sh-heal
 on:
@@ -348,15 +343,14 @@ jobs:
           # which applies to every LATER step — including the one that runs
           # `git push` under GH_TOKEN.
           #
-          # Not closed here, and the reason is the failure this block already
-          # shipped once. Hashing $GITHUB_ENV's PATH is what made the guard
-          # refuse every cycle on every repo, because Actions reallocates that
-          # file per step. Any replacement — comparing env between the two
-          # steps, or asserting the GIT_* namespace is empty — is a claim about
-          # runner behaviour that CANNOT be validated without a runner, and no
-          # runner will execute this. An unvalidated measurement here fails
-          # closed on every cycle and nothing would report it. Documented as
-          # reachable rather than guessed at.
+          # Not closed by measuring the environment, and the reason is what
+          # measuring the wrong thing costs here. This block and the guard's
+          # copy run in DIFFERENT steps, so anything compared between them must
+          # be identical across a step boundary or the guard refuses every
+          # cycle — which is exactly how hashing the two paths above failed.
+          # Env is not reliably identical across that boundary, and a guard
+          # that fails closed on every cycle blocks the loop completely while
+          # looking like a working check.
           #
           # The guard re-runs this block verbatim. The two must stay identical:
           # a baseline measuring a different surface from the comparison is not
