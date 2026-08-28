@@ -111,7 +111,7 @@ Show the Phase 1 table first, in one block, values plus provenance, and ask for 
 1. **Does this project have a machine-checkable notion of correct?** Tests exist · must be generated · genuinely cannot. The third is a **stop**: the gate is the only thing between a headless agent and the default branch, and it works by running tests. Record as `{{TEST_ORIGIN}}`.
 2. **Where do its failures surface?** A log on disk · the host's logs · CI only · nowhere readable yet, because they are client-side. A host logs what runs on **its own** machines, so a browser error reaches none of them — say that before listing the options, and on the last one load [reference/platforms.md](reference/platforms.md) and draw the data flow first, because the option selects a follow-up question rather than a log surface. Record as `{{LOG_SURFACE}}`. The decision the visibility rule exists for.
 3. *(2 = client-side)* **How do we make them visible?** Generate a relay endpoint · adopt an error tracker · accept regression-only healing. **This one changes the product**: say so plainly, because option one adds a public HTTP endpoint to their repo. Record as `{{BROWSER_FIX}}`.
-4. *(2 = host logs, **or** 3 = generate a relay)* **What is the log retention, and which plan tier sets it?** Ask the tier, look the value up in the platform's own docs, show the number to confirm. Record as `{{RETENTION}}` and set the cron from it (`{{CRON}}`). Wrong here loses failures silently, and idle looks healthy. Retention caps the interval; the repo's Actions-minute allowance prices it, so quote the monthly cost of any cadence you recommend. Mechanics, including why the relay branch needs this too: [reference/platforms.md](reference/platforms.md).
+4. *(2 = host logs, **or** 3 = generate a relay)* **What is the log retention, and which plan tier sets it?** Ask the tier, look the value up in the platform's own docs, show the number to confirm. Record as `{{RETENTION}}` and set the cron from it (`{{CRON}}`). Wrong here loses failures silently, and idle looks healthy. Retention caps the interval; the repo's Actions-minute allowance prices it, so quote how many runs a month the cadence you recommend costs. Mechanics, including why the relay branch needs this too: [reference/platforms.md](reference/platforms.md).
 5. **What deploys this, and how?** A command · push-triggered · nothing. Record as `{{DEPLOY_CMD}}`, empty for the last two.
 6. *(5 ≠ nothing)* **How do we know the merged commit is live?** Record as `{{HEALTH_STRATEGY}}`. Push-triggered deploys are asynchronous, so a probe fired right after a merge reads the previous build and reports healthy whatever just shipped.
 7. **What is off-limits to the loop?** Paths, services, anything with irreversible side effects. Record as `{{OFF_LIMITS}}`.
@@ -200,7 +200,7 @@ The adapter does not deploy or roll back: the workflow runs `{{DEPLOY_CMD}}` and
 ## Phase 6 — Drop the workflows
 
 - Copy `workflows/watch.yml` and `workflows/heal.yml` into `.github/workflows/`.
-- **`watch.yml` ships with its `schedule` block commented out. Leave it that way.** Write the `{{CRON}}` value into that commented block so it is ready, but do not uncomment it: that is the operator's edit at Phase 10. The loop merges to the default branch unattended, so the disabled state is the default rather than something an instruction has to remember to impose.
+- **`watch.yml` ships with its `schedule` block commented out. Leave it that way.** Write the `{{CRON}}` value into that commented block so it is ready, but do not uncomment it: that is the operator's edit at Phase 9b. The loop merges to the default branch unattended, so the disabled state is the default rather than something an instruction has to remember to impose.
 - Confirm the secret discipline is intact. The invariant is **no secret on any step that executes agent-authored code**: Diagnose writes the reproducing test from an untrusted log, and that code runs under the test runner, so Red, Green, Run-suite, Gate and Verify hold nothing.
     - Do not check this as "one token per step". The Fix step deliberately holds `SHL_AUTH_TOKEN` **and** `GH_TOKEN`, because it also posts the attempt-cap escalation comment and runs no test code itself.
 
@@ -208,7 +208,7 @@ The adapter does not deploy or roll back: the workflow runs `{{DEPLOY_CMD}}` and
 
 **You set the variables, the operator sets the secrets.** `gh variable set` carries values you already hold; `gh secret set` prompts locally for one only they have. **Never ask for a secret value in the conversation** — it would land in the transcript, and nothing needs it there.
 
-`SETUP.md` carries the full variable table, the secrets and the exact `gh` commands. Point the operator there and do not repeat the list here — two copies of a config table drift, and theirs is the one they will actually run.
+`SETUP.md` carries the full variable table, the secrets and the exact `gh` commands; do not repeat the list here, because two copies of a config table drift. Run its `gh variable set` lines yourself and hand the operator the `gh secret set` lines.
 
 Two things worth saying out loud rather than leaving in a table:
 
