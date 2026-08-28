@@ -1,12 +1,12 @@
 """The one rule for "a path, or `-` for stdin", shared by both entry points.
 
 `loop.py` and `guardrails/cli.py` are separate command-line surfaces that the
-workflows drive with the same convention, and each used to implement it. They
-had already drifted on the missing-argument case. This project's most expensive
+workflows drive with the same convention. This project's most expensive
 recurring defect is two callers following one rule separately until they follow
-it differently, so the rule is a function to call rather than a convention to
-remember (L9) — and living in `guardrails/` keeps it importable from `loop.py`
-without a guardrail importing the loop entry point back.
+it differently, and the missing-argument case is where these two diverge first,
+so the rule is a function to call rather than a convention to remember (L9) —
+and living in `guardrails/` keeps it importable from `loop.py` without a
+guardrail importing the loop entry point back.
 """
 import sys
 from pathlib import Path

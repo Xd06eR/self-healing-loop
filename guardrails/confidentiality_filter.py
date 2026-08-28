@@ -27,10 +27,10 @@ _DEFAULT_PATTERNS: list[tuple[str, re.Pattern]] = [
     ("jwt", re.compile(r"eyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}")),
     (
         "key=value secret",
-        # `key=value` and JSON's `"key": "value"` — the quote between key and
-        # colon used to hide the whole value from this rule, leaking a bare
-        # provider token verbatim on the scrubber's own documented primary
-        # path: any agent output quoting env or config as JSON.
+        # `key=value` and JSON's `"key": "value"`. The optional quote BEFORE the
+        # separator is load-bearing: without it the JSON form escapes this rule
+        # entirely and a bare provider token ships verbatim, on the scrubber's
+        # own primary path — any agent output quoting env or config as JSON.
         re.compile(
             r'(?i)(api[_-]?key|token|secret|password|passwd|pwd|auth)["\']?\s*[=:]\s*["\']?\S+'
         ),
