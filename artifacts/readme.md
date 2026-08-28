@@ -62,7 +62,7 @@ Disabling the workflows in *Actions → … → Disable workflow* does the same 
 
 ## Something it did is wrong
 
-- **A bad PR is open.** Close it. That alone records nothing: attempts are counted from comments on the linked *issue*, so add `fix attempt N failed: <why>` there if you want it to count. The loop records its own failed attempts, and escalates after 2 instead of retrying.
+- **A bad PR is open.** Close it. That alone records nothing — the loop counts attempts from comments on the linked *issue*, so closing a PR silently leaves the count where it was and the next tick tries again. To stop it, comment `fix attempt 2 failed: <why>` on the issue. The number is not a tally you increment: the loop takes the highest one it finds and escalates to a human at 2, so `2` is what ends the retries whatever went before it.
 - **A bad fix already merged.** Revert it like any other commit. The loop records reverted fixes and warns itself not to try the same thing again.
 - **It keeps filing the same issue.** The failure fingerprints differently every run — an unstable identity, such as a line number that moves or an ephemeral port or id inside the stack frame. Not a missing one: a failure it cannot fingerprint at all is refused before any issue is filed. Check `failure_ids` in `adapters/target.py`, and `INSTALL-REPORT.md` under NOT verified.
 - **It is doing nothing at all.** Idle and healthy look identical from outside, and the Actions log does not separate them either — it prints `idle — nothing to heal` both when the log was clean and when nothing was read at all. Ask the adapter directly, with the same `SHL_*` values the workflow uses plus `SHL_LOG_TOKEN` in your environment:

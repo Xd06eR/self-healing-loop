@@ -1316,9 +1316,17 @@ class TheReadmeStatesTheRealAttemptCap(unittest.TestCase):
         text = (ARTIFACTS / "readme.md").read_text(encoding="utf-8")
         self.assertRegex(
             text,
-            rf"escalates after {cap}\b",
+            rf"escalates to a human at {cap}\b",
             f"under_attempt_cap defaults to {cap}; artifacts/readme.md says "
             "something else, and the operator reads the readme",
+        )
+        # The same number a second time, in the comment the operator is told to
+        # post. `count_attempts` takes the MAX, so a marker below the cap leaves
+        # it unarmed — the readme would be instructing a no-op. That the marker
+        # PARSES at all is pinned against the real regex in test_gh_state.
+        self.assertIn(
+            f"fix attempt {cap} failed:", text,
+            f"the instructed marker must reach the cap of {cap} on its own",
         )
 
     def test_no_placeholder_offers_to_configure_it(self):

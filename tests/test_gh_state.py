@@ -1,5 +1,9 @@
 import json
+import re
 import unittest
+from pathlib import Path
+
+README_TEMPLATE = Path(__file__).resolve().parents[1] / "artifacts" / "readme.md"
 
 from gh_state import (
     _marked_fingerprints,
@@ -260,6 +264,46 @@ class AgentWrittenProseCannotHijackTheDedupKey(unittest.TestCase):
             _marked_fingerprints("<!-- shl-fingerprint: A@x:1,B@y:2 -->"),
             {"A@x:1", "B@y:2"},
         )
+
+
+class TheOperatorsAttemptMarkerActuallyCounts(unittest.TestCase):
+    """The comment `artifacts/readme.md` tells an operator to post must work.
+
+    Two ways it silently does not, and both leave the operator believing they
+    armed the cap while the loop retries. `count_attempts` needs a DIGIT, so a
+    literal `N` matches the regex not at all and counts zero. And it takes the
+    MAX rather than a count, so a number at or below one the loop has already
+    posted for itself changes nothing.
+
+    Pinned against the real parser rather than restated, because the two drift
+    apart silently: nothing about a wrong instruction fails until an operator
+    follows it during an incident.
+    """
+
+    CAP = 2  # loop.under_attempt_cap's default; the loop escalates at this count.
+
+    def _instruction(self):
+        """The marker the readme tells the operator to post, taken from its code span."""
+        text = README_TEMPLATE.read_text(encoding="utf-8")
+        markers = re.findall(r"`(fix attempt [^`]*)`", text)
+        self.assertEqual(len(markers), 1, f"expected one instructed marker, got {markers}")
+        return markers[0]
+
+    def test_the_instructed_marker_parses_as_an_attempt(self):
+        body = f"{self._instruction()}"
+        self.assertEqual(count_attempts(1, gh_runner=lambda a: json.dumps(
+            {"comments": [{"body": body}]})), self.CAP)
+
+    def test_it_still_reaches_the_cap_beside_the_loops_own_comment(self):
+        # The loop posts `🤖 fix attempt 1 failed: ...` for itself. An operator
+        # marker at or below that leaves the max where it was, so the cap never
+        # fires and the next tick tries again.
+        comments = [
+            {"body": "🤖 fix attempt 1 failed: gate or suite"},
+            {"body": self._instruction()},
+        ]
+        reached = count_attempts(1, gh_runner=lambda a: json.dumps({"comments": comments}))
+        self.assertGreaterEqual(reached, self.CAP, "the operator's marker did not arm the cap")
 
 
 if __name__ == "__main__":
