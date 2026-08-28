@@ -331,9 +331,8 @@ jobs:
           # Review agent are both structurally blind to this, and the check has
           # to compare before against after rather than inspect a diff.
           #
-          # ACCEPTED GAP, stated precisely because a vague version of this
-          # comment previously understated it. What this block measures is
-          # FILES. Git also takes executable configuration from the
+          # ACCEPTED GAP, and the precision below is deliberate: what this
+          # block measures is FILES. Git also takes executable configuration from the
           # ENVIRONMENT — GIT_CONFIG_COUNT/GIT_CONFIG_KEY_*/GIT_CONFIG_VALUE_*
           # set core.hooksPath, and GIT_SSH_COMMAND, GIT_EXTERNAL_DIFF and
           # GIT_PROXY_COMMAND each name a program git runs. Verified: with

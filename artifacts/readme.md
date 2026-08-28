@@ -13,8 +13,8 @@ Its decisions are recorded in [SETUP.md](SETUP.md); what the install did and did
 Ask, rather than trusting this file — a written-down answer goes stale the moment someone edits the workflow:
 
 ```bash
-gh workflow list                       # enabled or disabled
-grep -A2 '^on:' .github/workflows/watch.yml   # is `schedule:` commented out?
+gh workflow list --all                            # --all, or a disabled one is simply absent
+grep -n 'schedule:' .github/workflows/watch.yml   # a leading `#` means the cron is off
 ```
 
 While the `schedule:` block is commented out, nothing runs unless someone triggers it by hand.
