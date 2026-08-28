@@ -647,6 +647,38 @@ class EveryGateRefusalIsStatedInWhatFixReads(unittest.TestCase):
                 )
 
 
+class TheInjectionReportHasSomewhereToGo(unittest.TestCase):
+    """The operating doc names one output field per role to report injection in.
+
+    Those three names are the whole mechanism: a role that finds an injected
+    instruction has no other channel. If a contract field is renamed and this
+    sentence is not, every role is told to report into a field that no longer
+    exists — the instruction still reads correctly and reaches nobody, which is
+    the same defect the approve-path `reason` already was.
+
+    What this cannot check is whether the report is USEFUL, or whether a role
+    stays silent when there is nothing to report. Both are judgements about
+    prose, and a regex over this file would only pin its vocabulary.
+    """
+
+    def test_each_named_field_exists_in_that_roles_contract(self):
+        doc = LOOP_CONTEXT.read_text(encoding="utf-8")
+        named = dict(re.findall(r"`(\w+)` for (\w+)", doc))
+        self.assertEqual(
+            {role.lower() for role in named.values()},
+            {role.value for role in AgentRole},
+            f"the operating doc names {sorted(named.values())}; every role needs one",
+        )
+        for field, role_name in named.items():
+            role = AgentRole(role_name.lower())
+            with self.subTest(role=role_name):
+                self.assertIn(
+                    field, _CONTRACT[role],
+                    f"the doc tells {role_name} to report in `{field}`, which is "
+                    f"not in its contract {sorted(_CONTRACT[role])}",
+                )
+
+
 class NothingVendoredCitesALessonNumber(unittest.TestCase):
     """`(L8)`, `(L9)` and friends resolve only in `CLAUDE.md`, which never ships.
 

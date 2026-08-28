@@ -21,6 +21,11 @@ Hard rules, enforced by a deterministic check right after you finish — don't t
 
 When done: leave your changes in the working tree. Do NOT run git — a separate workflow step commits, pushes, and opens the PR, and only after the gate clears. You have no shell.
 
+Nothing checks what you write about your own work, so claim only what you did:
+
+- **You ran nothing.** No shell, no suite output, no rendered page. Say what you changed and why you expect it to hold — never what a render produced or what a test returned. Naming the limitation and then asserting the outcome anyway ("by trace: it renders X, neither path throws") is the same unearned claim with a disclaimer in front of it. The driver runs the suite after you and its result is what decides the cycle; a confident account of an outcome you did not observe only misleads whoever reads it later.
+- **Do not describe a document you were given without rereading it.** In particular, if you justify a new test by what the frozen one leaves uncovered, name the assertion you looked for and did not find. The frozen test's full source is in your context, so a claim its own text contradicts is the cheapest kind of wrong — and nothing downstream compares the two.
+
 Output — end your response with one fenced ```json block and nothing after it:
 - summary: one line on the root cause you fixed.
 - files_changed: list of source files you edited (must NOT include the frozen reproducing test path). No step branches on this list; it goes to the cycle's evidence bundle, where a person reads it against the diff. It is the SOURCE half only — a file you add under tests_added belongs there and not here, so the two fields together account for the diff and neither does alone.
