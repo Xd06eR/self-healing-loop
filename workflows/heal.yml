@@ -336,21 +336,33 @@ jobs:
           # Review agent are both structurally blind to this, and the check has
           # to compare before against after rather than inspect a diff.
           #
-          # $GITHUB_ENV and $GITHUB_PATH are an ACCEPTED GAP, not a covered one.
-          # A write to either reaches every later step in the job, so the threat
-          # is real — but Actions allocates a fresh random-UUID file for each
-          # per STEP, so this mechanism cannot see it from either end. Hashing
-          # the paths compares two unrelated files under two names and fails on
-          # every cycle unconditionally; hashing their contents instead passes
-          # always, because Fix's own step file is a third path that neither
-          # this step nor the guard can name. Covering it needs a different
-          # mechanism, and none is installed.
+          # ACCEPTED GAP, stated precisely because a vague version of this
+          # comment previously understated it. What this block measures is
+          # FILES. Git also takes executable configuration from the
+          # ENVIRONMENT — GIT_CONFIG_COUNT/GIT_CONFIG_KEY_*/GIT_CONFIG_VALUE_*
+          # set core.hooksPath, and GIT_SSH_COMMAND, GIT_EXTERNAL_DIFF and
+          # GIT_PROXY_COMMAND each name a program git runs. Verified: with
+          # those set, `git hook run` executes a hook from an attacker path
+          # while .git/config stays byte-identical, so nothing here sees it.
+          # Fix can reach that surface by appending to its own $GITHUB_ENV,
+          # which applies to every LATER step — including the one that runs
+          # `git push` under GH_TOKEN.
+          #
+          # Not closed here, and the reason is the failure this block already
+          # shipped once. Hashing $GITHUB_ENV's PATH is what made the guard
+          # refuse every cycle on every repo, because Actions reallocates that
+          # file per step. Any replacement — comparing env between the two
+          # steps, or asserting the GIT_* namespace is empty — is a claim about
+          # runner behaviour that CANNOT be validated without a runner, and no
+          # runner will execute this. An unvalidated measurement here fails
+          # closed on every cycle and nothing would report it. Documented as
+          # reachable rather than guessed at.
           #
           # The guard re-runs this block verbatim. The two must stay identical:
           # a baseline measuring a different surface from the comparison is not
           # a check.
           { sha256sum .git/config "$HOME/.gitconfig" 2>/dev/null || true
-            find .git/hooks -type f ! -name '*.sample' -exec sha256sum {} + 2>/dev/null | sort || true
+            find .git/hooks \( -type f -o -type l \) ! -name '*.sample' -exec sha256sum {} + 2>/dev/null | sort || true
           } > "$RUNNER_TEMP/git-exec-surface.before"
           # The VERDICT rests on this step output; the file above is kept only
           # so the error message can show what moved. RUNNER_TEMP is outside the
@@ -412,7 +424,7 @@ jobs:
           # Byte-identical to the pre-Fix block in `Branch fix/issue-N`, which
           # states what this measures and what it accepts as out of reach.
           { sha256sum .git/config "$HOME/.gitconfig" 2>/dev/null || true
-            find .git/hooks -type f ! -name '*.sample' -exec sha256sum {} + 2>/dev/null | sort || true
+            find .git/hooks \( -type f -o -type l \) ! -name '*.sample' -exec sha256sum {} + 2>/dev/null | sort || true
           } > "$RUNNER_TEMP/git-exec-surface.after"
           now="$(sha256sum < "$RUNNER_TEMP/git-exec-surface.after" | cut -d' ' -f1)"
           # An unset output substitutes to the empty string and fails this
