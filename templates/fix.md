@@ -23,5 +23,5 @@ When done: leave your changes in the working tree. Do NOT run git — a separate
 
 Output — end your response with one fenced ```json block and nothing after it:
 - summary: one line on the root cause you fixed.
-- files_changed: list of source files you edited (must NOT include the frozen reproducing test path). No step branches on this list; it goes to the cycle's evidence bundle, where a person reads it against the diff.
+- files_changed: list of source files you edited (must NOT include the frozen reproducing test path). No step branches on this list; it goes to the cycle's evidence bundle, where a person reads it against the diff. It is the SOURCE half only — a file you add under tests_added belongs there and not here, so the two fields together account for the diff and neither does alone.
 - tests_added: any NEW test files you created (regression coverage), never the frozen one. Not required by the driver, and still expected: it is where a person later reads what the fix defended itself with. Omit the key only if you added none.

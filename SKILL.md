@@ -243,7 +243,7 @@ The PR from Phase 8 is the gate, and a real diff is the right place for it. **If
 
 Say why. The gate is a done-criterion **plus a boundary**: the frozen repro test flips red to green, and nothing was weakened, deleted or reconfigured to get it there. Without the boundary, "make the tests pass" is an instruction to delete tests. Those generated assertions are the boundary, and an unread one is a gate certifying its own author's work.
 
-The operator reviews and merges. The `schedule` block stays commented out.
+The operator reviews and merges. Record whether a fresh context audited that suite or they declined — a safeguard nobody can tell was skipped is not one.
 
 ## Phase 9b — Verify on a runner, after the merge
 

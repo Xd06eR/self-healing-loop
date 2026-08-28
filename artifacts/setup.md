@@ -246,6 +246,10 @@ Required:
 
 Only then enable the cron. It ships **disabled**: open `.github/workflows/watch.yml` and uncomment the `schedule` block. Until you do, the workflow runs only when you trigger it by hand.
 
+## The evidence bundle expires
+
+Every cycle uploads its bundle — each role's exact prompt, raw output and stderr — as a GitHub Actions artifact, under this repo's artifact retention. **Nothing here copies it anywhere durable.** It is the only record of *why* an agent did what it did, and the only material that can tell you whether a role's prompt needs changing. Download and keep the bundle from any cycle you care about, especially a first one or a failure, before retention takes it.
+
 ## Optional: prove it actually heals
 
 Skip this and the loop still works — you simply have not watched it work, and the install report says so under NOT verified.
