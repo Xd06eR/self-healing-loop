@@ -4,15 +4,20 @@
 
 A GitHub Actions workflow watches this project for failures. When it finds one it opens an issue, writes a test that reproduces the bug, fixes the source, checks the fix against a gate, opens a pull request, reviews it, and merges. No human is in the happy path.
 
-It was installed on {{INSTALL_DATE_OR_PR}} and its decisions are recorded in [SETUP.md](SETUP.md). What the install did and did not prove is in [INSTALL-REPORT.md](INSTALL-REPORT.md).
+Its decisions are recorded in [SETUP.md](SETUP.md); what the install did and did not prove is in [INSTALL-REPORT.md](INSTALL-REPORT.md), and `git log` for `.shl/` shows when it arrived.
 
-**Two things to know before you read further.** The unattended merge is deliberate, not a misconfiguration — this loop is designed to merge, deploy and revert without waiting for a person, and the sections below say how to stop it if that is not what your team agreed to. And the framework itself is young: it has been installed into very few projects, so if it does something surprising here, a defect in it is a real possibility rather than a remote one. `INSTALL-REPORT.md` lists what was actually verified on this repo, and everything not on that list is unproven here.
+**Two things to know before you read further.** The unattended merge is deliberate, not a misconfiguration — this loop is designed to merge, deploy and revert without waiting for a person, and the sections below say how to stop it if that is not what your team agreed to. And it is experimental: if it does something surprising here, a defect in the framework is a real possibility rather than a remote one. `INSTALL-REPORT.md` lists what was actually verified on this repo, and everything not on that list is unproven here.
 
 ## Is it running right now?
 
-**{{CRON_STATE}}**
+Ask, rather than trusting this file — a written-down answer goes stale the moment someone edits the workflow:
 
-The schedule lives in `.github/workflows/watch.yml`. While the `schedule:` block is commented out, nothing runs unless someone triggers it by hand.
+```bash
+gh workflow list                       # enabled or disabled
+grep -A2 '^on:' .github/workflows/watch.yml   # is `schedule:` commented out?
+```
+
+While the `schedule:` block is commented out, nothing runs unless someone triggers it by hand.
 
 ## What it touches
 
@@ -20,7 +25,7 @@ The schedule lives in `.github/workflows/watch.yml`. While the `schedule:` block
 - `.github/workflows/watch.yml` and `heal.yml` — the two workflows.
 - **Your source and tests**, when it is fixing something. A fix always arrives as a pull request, never as a direct push. Two things it does push directly, both after a fix has already merged: reverting a fix that broke the deployment, and appending to its own incident log.
 
-It also wrote these files into the project itself, which stay if the loop is removed: {{PRODUCT_FILES}}
+It also wrote files into the project itself, which stay if the loop is removed — [INSTALL-REPORT.md](INSTALL-REPORT.md) § *Files written into the PROJECT* lists them.
 
 Repository and organization **variables** are readable by the code the loop runs, including tests its agents wrote. Variables are not secrets in GitHub's model, and secrets travel a separate path the loop's test steps never see — but if something sensitive is stored as a variable rather than a secret, treat it as visible here.
 
@@ -43,12 +48,14 @@ A PR that reaches you has cleared the gate. It is still a machine's work and sti
 Pick by how hard you need it to stop.
 
 ```bash
-# Pause the schedule: comment out the `schedule:` block.
-$EDITOR .github/workflows/watch.yml
-
-# Stop it now, from the CLI.
+# Stop it now. Takes effect immediately; nothing to commit.
 gh workflow disable watch.yml
 gh workflow disable heal.yml
+
+# Or pause the schedule for good: comment out the `schedule:` block,
+# then COMMIT AND PUSH it to the default branch. Cron reads that branch
+# and nothing else, so an uncommitted local edit pauses nothing at all.
+$EDITOR .github/workflows/watch.yml
 ```
 
 Disabling the workflows in *Actions → … → Disable workflow* does the same thing from the UI. Neither touches code that already merged.
