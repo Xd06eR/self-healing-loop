@@ -19,6 +19,14 @@ The choice decides which class of bug the loop can ever heal. They **compose**: 
 
 Family 3 is the sane floor. Families 1 and 2 are what give the loop eyes on production.
 
+### When the failures are client-side, there is no family yet
+
+A host logs what runs on **its own** machines. Client-side JavaScript runs on the visitor's device, so no host log, no matter how good, ever holds it — which is why "client-side only" is not a fifth family but the statement that none of the four applies yet.
+
+Draw that before offering the options, because the fix changes the product. Today: the browser throws and nothing records it anywhere. With a relay: a listener on `error` and `unhandledrejection` POSTs the stack to a **new route in the operator's own repo**, that route logs it, the host's log now holds it, and `read_log` reads the host — family 2, with that host's retention.
+
+So the operator is not picking where to read. They are deciding whether their project gains a public HTTP endpoint. Show the flow, name the file that would be created, and let them answer that question rather than a menu.
+
 **Quality and coverage are different axes**, and conflating them wastes time. A synthetic monitor driving a real browser produces a traceback indistinguishable from an error tracker's: same *quality*. What it cannot do is exercise inputs nobody thought of, which is *coverage*. Only real error reporting has coverage that is not bounded by imagination.
 
 ## Retention sets the cron cadence

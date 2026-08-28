@@ -17,8 +17,6 @@ Installs the loop into the repo this skill runs in. After install, a GitHub Acti
 
 > A fact may be **determined** only if getting it wrong would be **visible**. If a wrong answer is indistinguishable from a correct one, it is **asked**, however strong the evidence looks.
 
-The test command passes: wrong, and every cycle dies loudly. The log surface fails: wrong, and the loop reads nothing, finds nothing, and idles, which looks exactly like a healthy project.
-
 **Never spend a question on something the repo answers.** A question the filesystem could have answered trains the operator to stop reading the ones that matter. Never ask about vendoring, the manifest check, the gitignore rules, copying the workflows, the adapter's TDD cycle, secret discipline, or the frozen-test and no-weakening rules. Those are mechanical and they are yours.
 
 **Reliability over speed.** Several rounds is the expected shape, not a failure.
@@ -59,6 +57,8 @@ Plus, **only when Phase 1 records them missing**, the prerequisites a loop canno
 
 **Can the bot act on this repo?** Two settings, both **blocking findings**. Both need a GitHub remote and a working `gh` — the two items below. If either of those is missing, this check is deferred with them rather than failing Phase 0: record it as unresolved and carry it into the Phases 7–10 pending list. Either one wrong and every cycle runs Diagnose, Red, Fix and the gate — spending agent calls — then dies at the PR or the merge. Forever, and loudly, so nothing bad merges; the loop simply never works.
 
+Every `gh` call you make in this phase reads; say so, and say that the one write below is the operator's.
+
 ```bash
 branch="$(gh repo view --json defaultBranchRef --jq .defaultBranchRef.name)"
 gh api "repos/{owner}/{repo}/branches/$branch" --jq '{protected}'   # the blocking signal
@@ -66,19 +66,15 @@ gh api "repos/{owner}/{repo}/rules/branches/$branch"                # rulesets, 
 gh api "repos/{owner}/{repo}/actions/permissions/workflow"
 ```
 
-**A 404 from the `/protection` endpoint means nothing.** Genuinely unprotected, a non-admin token, and a ruleset all return it, indistinguishable from the status alone — which is why the block above asks `.protected` and the rules endpoint, both readable without admin.
-
 Name the default branch explicitly rather than using `gh`'s `{branch}` placeholder, which resolves to whatever is checked out. Protected with no bot bypass: report it and let the operator grant one.
 
-`heal.yml` also runs `gh pr create`, which needs `can_approve_pull_request_reviews: true`. That is a repo policy toggle, off by default on repos created since 2023, and **no workflow `permissions:` block overrides it**. The operator fixes both fields, either way:
+`heal.yml` also runs `gh pr create`, which needs `can_approve_pull_request_reviews: true`. That is a repo policy toggle, off by default on repos created since 2023, and **no workflow `permissions:` block overrides it**. The operator fixes both fields; `SETUP.md` carries this and the UI path for a machine with no working `gh`:
 
 ```bash
 gh api -X PUT "repos/{owner}/{repo}/actions/permissions/workflow" \
   -f default_workflow_permissions=write \
   -F can_approve_pull_request_reviews=true
 ```
-
-or *Settings → Actions → General → Workflow permissions*: select **Read and write permissions**, tick **Allow GitHub Actions to create and approve pull requests**.
 
 **Required before the loop runs**, not before writing files. If either is missing, install anyway, record the gap, and mark Phases 7–10 pending:
 
@@ -104,24 +100,24 @@ Read-only. Record each finding **with the file it came from**. Verify; never inf
 How to ask:
 
 - **Alone when the answer changes what you ask next.** Every decision below carrying a precondition gates the ones after it, so those go singly, in order, waiting for each answer.
-- **Batched otherwise**, around four to an exchange, by whatever mechanism this harness offers for putting choices to a person. A decision that cannot change any other still costs a full round trip alone, and a run of those teaches the operator to click rather than read.
+- **Batched otherwise**, around four to an exchange, by whatever mechanism this harness offers for putting choices to a person. A decision that cannot change any other still costs a full round trip alone, and a run of those teaches the operator to click rather than read. Then read every answer for content belonging to a *different* question: batched replies land in the wrong slot, and a correction dropped that way is never seen again.
 - **A recommended answer with every question**, and the reasoning. The operator is deciding, not doing the analysis.
 - **Show the evidence** you gathered alongside it.
 - **Do not act until shared understanding is confirmed.**
 - **Re-walk a branch when an answer invalidates earlier discovery.** Choosing an error tracker changes both retention and cadence; carrying the old answer forward is how a record ends up describing an install that does not exist.
 
-Show the Phase 1 table first, in one block, values plus provenance, and ask for corrections rather than approval. Then the decisions, in order, skipping any whose precondition does not hold:
+Show the Phase 1 table first, in one block, values plus provenance, and ask for corrections rather than approval. Then the decisions, in order, skipping any whose precondition does not hold and any the conversation has already answered:
 
 1. **Does this project have a machine-checkable notion of correct?** Tests exist · must be generated · genuinely cannot. The third is a **stop**: the gate is the only thing between a headless agent and the default branch, and it works by running tests. Record as `{{TEST_ORIGIN}}`.
-2. **Where do its failures surface?** A log on disk · the host's logs · the visitor's browser only · CI only. Record as `{{LOG_SURFACE}}`. The decision the visibility rule exists for.
-3. *(2 = browser only)* **How do we make them visible?** Generate a relay endpoint · adopt an error tracker · accept regression-only healing. **This one changes the product**: say so plainly, because option one adds a public HTTP endpoint to their repo. Record as `{{BROWSER_FIX}}`.
+2. **Where do its failures surface?** A log on disk · the host's logs · CI only · nowhere readable yet, because they are client-side. A host logs what runs on **its own** machines, so a browser error reaches none of them — say that before listing the options, and on the last one load [reference/platforms.md](reference/platforms.md) and draw the data flow first, because the option selects a follow-up question rather than a log surface. Record as `{{LOG_SURFACE}}`. The decision the visibility rule exists for.
+3. *(2 = client-side)* **How do we make them visible?** Generate a relay endpoint · adopt an error tracker · accept regression-only healing. **This one changes the product**: say so plainly, because option one adds a public HTTP endpoint to their repo. Record as `{{BROWSER_FIX}}`.
 4. *(2 = host logs, **or** 3 = generate a relay)* **What is the log retention, and which plan tier sets it?** Ask the tier, look the value up in the platform's own docs, show the number to confirm. Record as `{{RETENTION}}` and set the cron from it (`{{CRON}}`). Wrong here loses failures silently, and idle looks healthy. Retention caps the interval; the repo's Actions-minute allowance prices it, so quote the monthly cost of any cadence you recommend. Mechanics, including why the relay branch needs this too: [reference/platforms.md](reference/platforms.md).
 5. **What deploys this, and how?** A command · push-triggered · nothing. Record as `{{DEPLOY_CMD}}`, empty for the last two.
 6. *(5 ≠ nothing)* **How do we know the merged commit is live?** Record as `{{HEALTH_STRATEGY}}`. Push-triggered deploys are asynchronous, so a probe fired right after a merge reads the previous build and reports healthy whatever just shipped.
 7. **What is off-limits to the loop?** Paths, services, anything with irreversible side effects. Record as `{{OFF_LIMITS}}`.
 8. *(1 = must be generated)* **Who reviews the generated tests, and when?** Record as `{{TEST_REVIEW}}`.
 9. **Escalation: who is told, and how?** Record as `{{ESCALATION}}`. The loop stops and asks for a human at the attempt cap, and that has to reach someone.
-10. **Which harness, then whose credential?** In that order: `claude-code` or `opencode`, then the credential path, which decides the token's env var and whether a base URL applies. Paths, model-id formats and the traps: [reference/harnesses.md](reference/harnesses.md). Record as `{{HARNESS}}`, `{{MODEL}}`, `{{BASE_URL}}`, `{{AUTH_ENV}}`, `{{AUTH_PATH}}`. Not discoverable from the repo.
+10. **Which harness, then whose credential?** In that order: `claude-code` or `opencode`, then the credential path, which decides the token's env var and whether a base URL applies. The second half is three values only they hold, so **ask for the values, not a menu of providers**. Paths, model-id formats and the traps: [reference/harnesses.md](reference/harnesses.md). Record as `{{HARNESS}}`, `{{MODEL}}`, `{{BASE_URL}}`, `{{AUTH_ENV}}`, `{{AUTH_PATH}}`. Not discoverable from the repo.
 
 ## Phase 3 — Write the decision record
 
@@ -135,7 +131,7 @@ A decision earns a written reasoning paragraph only when all three hold: **hard 
 
 ## Phase 4 — Vendor the portable core
 
-- Copy the manifest into `.shl/`, dot-prefixed like `.github/` to signal installed tooling rather than the project's own source.
+- Copy the manifest into `.shl/`.
 - Copy `loop_context/CLAUDE.md` to `.shl/CLAUDE.md`; it auto-loads because the loop runs the agent with cwd `.shl/`. **Also create `AGENTS.md` beside it**, a symlink or a copy. Claude Code auto-loads `CLAUDE.md`, most other harnesses `AGENTS.md`; ship one name and the agent still runs, just uninstructed, which reads as a bad model rather than a missing file.
 - Copy **both** `adapters/__init__.py` and `adapters/base.py`. `__init__.py` is what finds and imports `adapters/target.py`; an install missing it dies on the first cycle.
 - **Write `.shl/.gitignore`.** Load-bearing, not hygiene: the gate step runs `git add -A`, so without these the cycle's own evidence and raw agent output land in the fix diff.
@@ -186,8 +182,6 @@ A decision earns a written reasoning paragraph only when all three hold: **hard 
     ```
 
 ## Phase 5 — Make the target able to run the loop
-
-Two halves, in order, coupled on purpose: `failing_tests()` parses the suite 5a may have just created, and `read_log` reads the surface 5a may have just wired.
 
 ### 5a — Close the gaps
 

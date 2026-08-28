@@ -16,7 +16,7 @@ The gate runs tests. With none, nothing sits between the fix agent and the defau
 
 Before writing anything, **read the lockfile and the existing config**. A project often already depends on a runner nobody wired up, and adopting what is there beats adding a second one.
 
-- [ ] Pick the runner the ecosystem already expects, preferring anything present in the lockfile or config: vitest for a Vite or Next project, jest where it is already configured, pytest for Python, `go test` for Go. Never introduce a second runner beside an existing one.
+- [ ] Pick the runner the ecosystem already expects, preferring anything present in the lockfile or config: vitest for a Vite or Next project, jest where it is already configured, pytest for Python, `go test` for Go. Never introduce a second runner beside an existing one. Where the runner is not already a dependency, installing it **adds a package to the operator's manifest** — name it and get agreement first, rather than treating it as implied by the decision to generate a suite.
 - [ ] Generate tests over the project's **pure logic first**: functions that take values and return values, with no I/O, network or DOM. They need no fixtures, they are where regressions actually bite, and they are the part you can characterise correctly from reading alone.
 - [ ] **Drop anything you cannot justify from the code.** A test whose expected value you inferred rather than derived is worse than no test: it becomes a requirement the fix agent must satisfy forever.
 - [ ] Wire the runner into the project's own conventions (its test script, its config, its test directory) and set `SHL_TEST_CMD`, `SHL_TEST_ONE` and `SHL_REPRO_PATH` to match what you created.
