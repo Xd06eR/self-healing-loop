@@ -376,6 +376,69 @@ class InstallWritesADurableReport(unittest.TestCase):
                 )
 
 
+class TheTwoVerificationProceduresStayInStep(unittest.TestCase):
+    """The must-pass procedure has two homes and they drift.
+
+    `reference/verifying-the-install.md` is the framework's copy; the operator
+    reads `SETUP.md`'s, which is the one open while they run it. They have
+    drifted twice — once when only one of them dropped "inject a fix that
+    weakens a test" for the runnable form, and once when only one gained the
+    rule that a seeded failure has to look like an error.
+
+    Pinned on the two things a wrong copy gets wrong in a way that costs a
+    cycle: the invocation, and the flags that decide whether the gate reads
+    this project's tests at all. Wording is deliberately not pinned — these
+    address different readers and are not meant to be identical text.
+    """
+
+    PAIR = ("reference/verifying-the-install.md", "artifacts/setup.md")
+    FLAGS = ("--test-globs", "--assert-pattern")
+
+    def _sources(self):
+        root = SKILL.parent
+        return [(rel, (root / rel).read_text(encoding="utf-8")) for rel in self.PAIR]
+
+    def _invocation(self, text: str) -> str:
+        """The command itself, not the document.
+
+        Both files also DISCUSS `--assert-pattern` in the prose explaining a
+        zero exit, so a whole-document search for the flag is satisfied by that
+        sentence while the command above it has lost it — proven by mutation,
+        which is the only reason this reads the block instead of the file.
+        """
+        start = text.index("guardrails.cli gate --diff")
+        return text[start:text.index("```", start)]
+
+    def test_both_run_the_gate_the_same_way(self):
+        for rel, text in self._sources():
+            with self.subTest(doc=rel):
+                self.assertIn(
+                    "guardrails.cli gate --diff", text,
+                    "the must-pass procedure here is not the runnable one, so it "
+                    "describes a check the operator cannot perform",
+                )
+                invocation = self._invocation(text)
+                for flag in self.FLAGS:
+                    self.assertIn(
+                        flag, invocation,
+                        f"{flag} is missing from the command, so this copy runs a "
+                        "NARROWER gate than every cycle does and can pass a diff "
+                        "the real gate blocks",
+                    )
+
+    def test_both_require_the_seeded_failure_to_look_like_one(self):
+        # A probe worded as plain prose is discarded by the compactor, the
+        # watch reports IDLE, and it reads as a broken loop. Costs two rounds
+        # of debugging the wrong thing.
+        for rel, text in self._sources():
+            with self.subTest(doc=rel):
+                self.assertRegex(
+                    text, r"(?i)error vocabulary",
+                    "this copy does not tell the operator the seeded failure has "
+                    "to carry error vocabulary, so a valid probe reads as a dead loop",
+                )
+
+
 class RecordHasAHomeForEveryDecision(unittest.TestCase):
     """The interview asks; the record has to be able to hold the answers.
 

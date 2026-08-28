@@ -267,6 +267,7 @@ gh workflow run watch.yml --ref self-healing-loop-install
 ```
 
 - [ ] Seed one small, self-contained defect plus a test that fails on it, on the install branch. Put it where this project's log surface will actually record it — a failure nothing logs does not exist to the loop, and the loop will idle looking healthy.
+- [ ] **Make it fail like an error, and confirm the log holds it.** Compaction keeps only lines carrying error vocabulary and a trace, so a defect that logs a plain sentence is discarded, the watch reports IDLE, and it reads as a broken loop rather than a badly-shaped probe. Run `read_log()` and see the failure in its output before spending a dispatch.
 - [ ] Dispatch the watch as above (or *Actions → sh-watch → Run workflow*, selecting that branch). Confirm the whole chain: issue filed, reproducing test written and RED, fix applied, gate green, PR opened, review passed, merge, deploy if configured, verify, incident recorded.
 - [ ] **Must-pass: prove the gate BLOCKS a weakened test.** There is no way to inject a fix into a cycle — the agent authors it — so run the gate against a weakened diff directly. Delete an assertion from any test file, then:
 
