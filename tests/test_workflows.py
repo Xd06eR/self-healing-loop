@@ -349,23 +349,26 @@ class GitsOwnExecutionSurfaceIsWatched(unittest.TestCase):
         self.assertIn(".git/hooks", step["body"])
 
     def test_the_surface_reaches_outside_the_checkout(self):
-        """git executes more than the checkout's own `.git/`, and so does Actions.
+        """git executes more than the checkout's own `.git/`.
 
         `$HOME/.gitconfig` carries the same `core.fsmonitor` reach and is read
         by every git call — a global config planted there executes while both
-        snapshots of the checkout come back byte-identical. `$GITHUB_ENV` and
-        `$GITHUB_PATH` are applied to every LATER step in the job, so a write
-        there is a write into every command that follows.
+        snapshots of the checkout come back byte-identical.
 
         Both snapshot blocks, pre-Fix and guard: the comparison only protects
         what BOTH of them hash, and the two blocks are separate text that has
         to be kept in step by hand.
+
+        The ceiling, stated because it used to be asserted as coverage: the
+        Actions file commands (`$GITHUB_ENV`, `$GITHUB_PATH`) reach every later
+        step and are NOT covered here. Their paths are per-step, so neither end
+        of a before/after comparison can name the file Fix actually wrote.
+        `test_nothing_measured_is_reallocated_per_step` pins them OUT.
         """
         blocks = [self._snapshot_step()["body"], self._guard()["body"]]
         for i, body in enumerate(blocks):
-            for target in ("$HOME/.gitconfig", '"$GITHUB_ENV"', '"$GITHUB_PATH"'):
-                with self.subTest(block="pre-fix" if i == 0 else "guard", target=target):
-                    self.assertIn(target, body)
+            with self.subTest(block="pre-fix" if i == 0 else "guard"):
+                self.assertIn("$HOME/.gitconfig", body)
 
     def _guard(self):
         return next(s for s in job_steps("heal.yml") if s["name"].startswith("Loop tree"))
@@ -437,6 +440,63 @@ class GitsOwnExecutionSurfaceIsWatched(unittest.TestCase):
             "the guard does not compare the measured surface against the "
             "pre-Fix step output and exit non-zero when they differ",
         )
+
+    # The two blocks below are the seam between the pre-Fix snapshot and the
+    # guard. Both sides had structural tests and neither had a test of the
+    # agreement between them, which is how a measurement that can never match
+    # shipped and failed every cycle on every repo.
+
+    MEASUREMENT_OPEN = "{ sha256sum"
+    MEASUREMENT_CLOSE = '} > "$RUNNER_TEMP/git-exec-surface.'
+
+    def _measurements(self, step: dict) -> list[str]:
+        """The measurement commands inside one `{ … } > file` block."""
+        lines = step["body"].splitlines()
+        start = next(
+            i for i, line in enumerate(lines)
+            if line.strip().startswith(self.MEASUREMENT_OPEN)
+        )
+        end = next(
+            i for i, line in enumerate(lines[start:], start)
+            if line.strip().startswith(self.MEASUREMENT_CLOSE)
+        )
+        return [line.strip() for line in lines[start:end] if line.strip()]
+
+    def test_both_sides_measure_the_same_surface(self):
+        """A baseline and a comparison that measure different things is not a
+        check, it is a coin flip — and the direction it lands is unconditional.
+
+        Neither side is authoritative, so this pins them equal rather than
+        pinning either to a literal. The first line carries the `{` and the
+        last carries no `}`, so the sets compare as written.
+        """
+        before = self._measurements(self._snapshot_step())
+        after = self._measurements(self._guard())
+        self.assertEqual(
+            before, after,
+            "the pre-Fix snapshot and the guard measure different surfaces, so "
+            "the comparison between them cannot mean what it claims",
+        )
+
+    def test_nothing_measured_is_reallocated_per_step(self):
+        """Actions gives each STEP its own random-UUID file for the file
+        commands, and `sha256sum <path>` prints the path beside the digest.
+
+        Measuring one is therefore two unrelated files under two names: the
+        comparison fails on every cycle, on every repo, unconditionally, and
+        the loop can diagnose and fix and never ship. Hashing their contents
+        instead would pass always and prove as little — Fix's own step file is
+        a third path neither measurement ever sees.
+        """
+        per_step = ("GITHUB_ENV", "GITHUB_PATH", "GITHUB_OUTPUT", "GITHUB_STEP_SUMMARY")
+        for step in (self._snapshot_step(), self._guard()):
+            for line in self._measurements(step):
+                for name in per_step:
+                    self.assertNotIn(
+                        name, line,
+                        f"{step['name']!r} measures ${name}, which Actions "
+                        f"reallocates per step: {line}",
+                    )
 
 
 class VerifyAsksTheSameTwoQuestionsTheGateDoes(unittest.TestCase):

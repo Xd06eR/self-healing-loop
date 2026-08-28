@@ -335,8 +335,21 @@ jobs:
           # `.git/` is untracked, so it appears in NO diff: the gate and the
           # Review agent are both structurally blind to this, and the check has
           # to compare before against after rather than inspect a diff.
+          #
+          # $GITHUB_ENV and $GITHUB_PATH are an ACCEPTED GAP, not a covered one.
+          # A write to either reaches every later step in the job, so the threat
+          # is real — but Actions allocates a fresh random-UUID file for each
+          # per STEP, so this mechanism cannot see it from either end. Hashing
+          # the paths compares two unrelated files under two names and fails on
+          # every cycle unconditionally; hashing their contents instead passes
+          # always, because Fix's own step file is a third path that neither
+          # this step nor the guard can name. Covering it needs a different
+          # mechanism, and none is installed.
+          #
+          # The guard re-runs this block verbatim. The two must stay identical:
+          # a baseline measuring a different surface from the comparison is not
+          # a check.
           { sha256sum .git/config "$HOME/.gitconfig" 2>/dev/null || true
-            sha256sum "$GITHUB_ENV" "$GITHUB_PATH" 2>/dev/null || true
             find .git/hooks -type f ! -name '*.sample' -exec sha256sum {} + 2>/dev/null | sort || true
           } > "$RUNNER_TEMP/git-exec-surface.before"
           # The VERDICT rests on this step output; the file above is kept only
@@ -396,8 +409,9 @@ jobs:
           # Whole-content comparison rather than a list of dangerous keys: an
           # enumeration goes stale the next time git adds a setting, and stops
           # covering it without saying so.
+          # Byte-identical to the pre-Fix block in `Branch fix/issue-N`, which
+          # states what this measures and what it accepts as out of reach.
           { sha256sum .git/config "$HOME/.gitconfig" 2>/dev/null || true
-            sha256sum "$GITHUB_ENV" "$GITHUB_PATH" 2>/dev/null || true
             find .git/hooks -type f ! -name '*.sample' -exec sha256sum {} + 2>/dev/null | sort || true
           } > "$RUNNER_TEMP/git-exec-surface.after"
           now="$(sha256sum < "$RUNNER_TEMP/git-exec-surface.after" | cut -d' ' -f1)"
