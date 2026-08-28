@@ -164,7 +164,7 @@ def _header_pair(line: str) -> Optional[tuple[str, str]]:
     old path and says nothing about the new. Every reader of a diff header goes
     through here. The last time two of them restated these patterns separately,
     one learned to decode git's quoting and the other did not, so an accented
-    filename was policed by half the checks (L9).
+    filename was policed by half the checks.
     """
     match = _DIFF_HEADER_RE.match(line)
     if match:

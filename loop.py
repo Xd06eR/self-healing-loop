@@ -196,7 +196,7 @@ def repro_path(issue_number) -> str:
     Every driver calls this rather than substituting the pattern itself. Two
     drivers given the same rule eventually follow it differently, and the copy
     nothing tests is the one that ships — so this is a function to call, not a
-    rule to follow (L9). Exposed as ``loop.py repro-path N`` for the workflow,
+    rule to follow. Exposed as ``loop.py repro-path N`` for the workflow,
     which is shell.
     """
     return _repro_path_pattern().replace("{}", str(issue_number))

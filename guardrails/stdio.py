@@ -1,10 +1,10 @@
 """The one rule for "a path, or `-` for stdin", shared by both entry points.
 
 `loop.py` and `guardrails/cli.py` are separate command-line surfaces that the
-workflows drive with the same convention. This project's most expensive
+workflows drive with the same convention. The framework's most expensive
 recurring defect is two callers following one rule separately until they follow
 it differently, and the missing-argument case is where these two diverge first,
-so the rule is a function to call rather than a convention to remember (L9) —
+so the rule is a function to call rather than a convention to remember —
 and living in `guardrails/` keeps it importable from `loop.py` without a
 guardrail importing the loop entry point back.
 """

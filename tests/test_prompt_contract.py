@@ -647,5 +647,45 @@ class EveryGateRefusalIsStatedInWhatFixReads(unittest.TestCase):
                 )
 
 
+class NothingVendoredCitesALessonNumber(unittest.TestCase):
+    """`(L8)`, `(L9)` and friends resolve only in `CLAUDE.md`, which never ships.
+
+    That file is the framework's dev guide. What lands in a target is
+    `loop_context/CLAUDE.md`, which defines no lesson numbers, so a citation in
+    vendored code points an operator — or an agent reading its own tree — at a
+    document that is not there. Every site that carried one already stated the
+    lesson in the surrounding sentence, so the citation was pure dangle.
+
+    Mechanical because the recurrence is: `gate.py` diagnoses this exact hazard
+    in its own header and then carried a bare `(L9)` a hundred lines below it.
+    """
+
+    # What the install copies into `.shl/`. Kept as globs rather than the
+    # SKILL.md manifest because this is about REACHABILITY, not vendoring
+    # fidelity: a file that ships is a file whose references must resolve there.
+    VENDORED = (
+        "*.py", "adapters/**/*.py", "agent/**/*.py", "guardrails/**/*.py",
+        "templates/*.md", "loop_context/*.md",
+    )
+    CITATION = re.compile(r"\(L\d+\)")
+
+    def test_no_vendored_file_cites_one(self):
+        checked, offenders = 0, []
+        for pattern in self.VENDORED:
+            for path in sorted(FRAMEWORK.glob(pattern)):
+                if "tests" in path.parts:
+                    continue
+                checked += 1
+                for number, line in enumerate(
+                    path.read_text(encoding="utf-8").splitlines(), start=1
+                ):
+                    if self.CITATION.search(line):
+                        offenders.append(f"{path.relative_to(FRAMEWORK)}:{number}: {line.strip()}")
+        self.assertEqual(offenders, [], "\n".join(offenders))
+        # Refuse to pass on an empty sweep: a renamed directory would otherwise
+        # report a clean bill over nothing at all.
+        self.assertGreater(checked, 15, f"only {checked} vendored files swept")
+
+
 if __name__ == "__main__":
     unittest.main()

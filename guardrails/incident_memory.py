@@ -3,8 +3,9 @@
 Records are matched on FINGERPRINTS (exception type + raise site, from
 ``log_compact.failure_fingerprints``), never on the human-written title. The
 title is prose: it varies every cycle because a model wrote it, so matching on
-it recognizes nothing. The fingerprint is derived from the same log on both
-sides, so an identical failure keys identically.
+it recognizes nothing. The fingerprint is derived from the same RAW log on
+both sides — never the compacted signal, whose dropped frames are exactly what
+an identity is built from — so an identical failure keys identically.
 """
 import json
 from dataclasses import asdict, dataclass, field
@@ -129,7 +130,7 @@ def record_cycle(
     copy of that text anywhere. `heal.yml` scrubs the issue title, the issue
     body, the PR summary and the review reason on their way to GitHub and
     handed this one through raw, which is exactly what a rule every caller must
-    remember produces (L9). Scrubbing at the seam means no caller can forget.
+    remember produces. Scrubbing at the seam means no caller can forget.
     """
     entry = IncidentRecord(
         issue_id=issue_id,
@@ -159,7 +160,7 @@ def search_similar(
     wrong reading of a string is loud: as one identity it matches nothing, and
     to ``set()`` it is a bag of characters that matches nothing either. Both
     read as "this failure is new", which is the shape of the defect that left
-    this mechanism dead behind four passing tests (L8).
+    this mechanism dead behind four passing tests.
     """
     if isinstance(fingerprints, str):
         raise TypeError(
