@@ -212,9 +212,11 @@ The adapter does not deploy or roll back: the workflow runs `{{DEPLOY_CMD}}` and
 - Confirm the secret discipline is intact. The invariant is **no secret on any step that executes agent-authored code**: Diagnose writes the reproducing test from an untrusted log, and that code runs under the test runner, so Red, Green, Run-suite, Gate and Verify hold nothing.
     - Do not check this as "one token per step". The Fix step deliberately holds `SHL_AUTH_TOKEN` **and** `GH_TOKEN`, because it also posts the attempt-cap escalation comment and runs no test code itself.
 
-## Phase 7 — Env and secrets (the operator runs these)
+## Phase 7 — Env and secrets
 
-`SETUP.md` carries the full variable table, the two secrets and the exact `gh` commands. Point the operator there and do not repeat the list here — two copies of a config table drift, and theirs is the one they will actually run.
+**You set the variables, the operator sets the secrets.** `gh variable set` carries values you already hold; `gh secret set` prompts locally for one only they have. **Never ask for a secret value in the conversation** — it would land in the transcript, and nothing needs it there.
+
+`SETUP.md` carries the full variable table, the secrets and the exact `gh` commands. Point the operator there and do not repeat the list here — two copies of a config table drift, and theirs is the one they will actually run.
 
 Two things worth saying out loud rather than leaving in a table:
 
@@ -247,7 +249,7 @@ Phase 2 approved a plan. This approves **code an agent wrote into the operator's
 
 The PR from Phase 8 is the gate, and a real diff is the right place for it. **If Phase 5a generated a test suite, the review must include reading it.** Ask for that explicitly rather than assuming it was inferred from a file list.
 
-Say why. The gate is a done-criterion **plus a boundary**: the done-criterion is the frozen repro test flipping red to green, and the boundary is that nothing under `.shl/` or `.github/workflows/` was touched, the frozen test was not edited (nor, in a dedicated test directory, its neighbours), no test was weakened, no test config touched, and nothing that passed now fails. Without the boundary, "make the tests pass" is an instruction to delete tests. Those generated assertions are the boundary, and an unread one is a gate certifying its own author's work.
+Say why. The gate is a done-criterion **plus a boundary**: the frozen repro test flips red to green, and nothing was weakened, deleted or reconfigured to get it there. Without the boundary, "make the tests pass" is an instruction to delete tests. Those generated assertions are the boundary, and an unread one is a gate certifying its own author's work.
 
 The operator reviews and merges. The `schedule` block stays commented out.
 
@@ -260,7 +262,7 @@ Only reachable now: until the merge, `workflow_dispatch` could not see either wo
 
 State the ceiling in the report rather than implying more was proved: `loop.py watch` constructs no agent, so **an IDLE result proves nothing about whether the harness runs on a runner.** That is first answered by a real failure, or by the optional verification above.
 
-Then the operator uncomments the `{{CRON}}` block in `.github/workflows/watch.yml`. Until that edit the loop runs only when triggered by hand.
+Then the operator uncomments the `{{CRON}}` block in `.github/workflows/watch.yml`.
 
 ## Phase 11 — Report
 

@@ -896,7 +896,7 @@ jobs:
       # even scrubbed logs must not leave the runner.
       - name: Upload evidence
         if: always() && vars.SHL_EVIDENCE_UPLOAD != 'false'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: self-healing-evidence-${{ github.run_id }}
           path: .shl/evidence/
