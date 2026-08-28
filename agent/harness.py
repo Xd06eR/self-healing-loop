@@ -296,7 +296,13 @@ _TARGET_SOURCE = ("--add-dir", "..")
 
 CLAUDE_CODE = HarnessConfig(
     name="claude-code",
-    install=("npm", "i", "-g", "@anthropic-ai/claude-code"),
+    # Pinned, like OpenCode below and for the same reason: the runner installs
+    # this fresh every cycle, so a floating spec makes the loop's behaviour a
+    # function of the date. What breaks across releases is exactly what this
+    # framework rests on — argv flags and permission semantics. `--max-turns`
+    # was removed from this CLI once already. The npm tag to read is `stable`;
+    # `latest` here tracks the same build as `next`.
+    install=("npm", "i", "-g", "@anthropic-ai/claude-code@2.1.236"),
     argv=("claude", "-p", "{prompt}"),
     role_argv={
         # dontAsk is the documented locked-down-CI mode, replacing `plan` — the

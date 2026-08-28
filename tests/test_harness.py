@@ -866,5 +866,32 @@ class TheDenialGuardComparesToolsNotSubstrings(unittest.TestCase):
         self.agent._assert_denies_what_it_claims(AgentRole.FIX, argv)
 
 
+class EveryHarnessInstallsAPinnedVersion(unittest.TestCase):
+    """An unpinned install makes the loop's behaviour a function of the date.
+
+    The runner installs the harness fresh on every cycle, so an unpinned spec
+    means a cycle that worked yesterday can break today with nothing in this
+    repo having changed — and the only evidence of what ran is whatever the
+    Actions log happened to print. That is the hardest class of failure to
+    diagnose here, because the framework's whole diagnostic story assumes the
+    tree explains the behaviour.
+
+    The pins also carry a real cost, stated so it is a choice rather than an
+    oversight: nothing here bumps them, so upgrading is a manual edit. Argv
+    flags and permission keys are what break across harness releases, and both
+    are exactly what this framework depends on.
+    """
+
+    def test_no_install_spec_floats(self):
+        for name, harness in REGISTRY.items():
+            with self.subTest(harness=name):
+                package = harness.install[-1]
+                self.assertRegex(
+                    package, r".+@\d+\.\d+\.\d+$",
+                    f"{name} installs {package!r}, which resolves to whatever "
+                    "the registry serves that morning",
+                )
+
+
 if __name__ == "__main__":
     unittest.main()

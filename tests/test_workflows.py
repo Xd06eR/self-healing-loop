@@ -1246,6 +1246,94 @@ class EveryIdentityIsDerivedFromTheRawLog(unittest.TestCase):
         self.assertNotIn("signal.txt", record)
 
 
+class TheReviewersReasonReachesAHumanOnEitherVerdict(unittest.TestCase):
+    """An APPROVED fix must not swallow the reviewer's paragraph.
+
+    `loop_context/CLAUDE.md` tells every role to report suspicious content in
+    the field it returns, and for Review that field is `reason`. Reading it
+    only on the block path means a reviewer who approves a fix *while flagging
+    an injected log* is heard by nobody — and the `issue_body` that carried the
+    injection travels on into incident memory, to be replayed into the prompt
+    of every later cycle that matches the same failure.
+
+    The evidence bundle keeps a copy either way. That is a second copy, not the
+    channel: it is a downloadable artifact nobody opens on a green cycle, while
+    the PR is where a person actually looks.
+    """
+
+    STEP = "Publish review verdict"
+
+    def setUp(self):
+        self.step = step_chunk("heal.yml", self.STEP)
+        self.code = executable(self.step)
+
+    def test_it_runs_on_the_approve_path(self):
+        self.assertIn("steps.rev.outputs.approved == 'true'", self.code)
+
+    def test_it_publishes_the_reason_to_the_pull_request(self):
+        self.assertIn("jq -er .reason", self.code)
+        self.assertIn("gh pr comment", self.code)
+
+    def test_the_reason_is_scrubbed_between_reading_and_posting(self):
+        # Review quotes the diff and the issue body back at itself, and both
+        # carry text derived from an untrusted log. Order is the assertion:
+        # a scrub that runs after the post redacts a file nobody reads again.
+        read = self.code.index("jq -er .reason")
+        scrub = self.code.index("guardrails.cli scrub")
+        post = self.code.index("gh pr comment")
+        self.assertLess(read, scrub, "the reason is posted before it is scrubbed")
+        self.assertLess(scrub, post, "the reason is posted before it is scrubbed")
+
+    def test_it_runs_before_the_merge(self):
+        # After the merge the PR is closed, and a comment on a closed PR is
+        # where review notes go to be missed.
+        whole = (WORKFLOWS / "heal.yml").read_text(encoding="utf-8")
+        self.assertLess(whole.index(f"name: {self.STEP}"), whole.index("name: Merge"))
+
+    def test_a_failed_comment_does_not_block_the_merge(self):
+        # The fix is good; refusing to ship it because GitHub rejected a
+        # comment trades a real merge for a cosmetic one. Warn instead, which
+        # is the same call the incident-log push already makes.
+        self.assertIn("::warning::", self.code)
+
+    def test_the_block_path_still_publishes_it(self):
+        blocked = executable(step_chunk("heal.yml", "Block + record attempt on review fail"))
+        self.assertIn("gh pr comment", blocked)
+        self.assertIn("jq -er .reason", blocked)
+
+
+class CheckoutStaysWhereTheGitGuardCanSeeIt(unittest.TestCase):
+    """`actions/checkout` is held at v5 on purpose, and the purpose is invisible.
+
+    v6 moved the persisted credential out of the local git config into
+    `$RUNNER_TEMP`, leaving `.git/config` pointing at it through an `includeIf`.
+    An included file IS git config — it can set `core.hooksPath` — so the bump
+    puts a third executable-config file outside the surface the pre-Fix guard
+    hashes, in a directory that guard's own comment records as writable by the
+    agent. Nothing about that failure is loud.
+
+    The usual reason to upgrade does not apply: v5 is already Node 24, and the
+    floating major keeps taking security backports. So this is a decision, not
+    a stale pin, and a routine bump would undo it without anyone reading why.
+    Reasoning in `CLAUDE.md` under residual risks.
+    """
+
+    def test_both_workflows_still_check_out_at_v5(self):
+        found = []
+        for name in ("watch.yml", "heal.yml"):
+            for line in executable((WORKFLOWS / name).read_text(encoding="utf-8")).splitlines():
+                if "actions/checkout@" in line:
+                    found.append(line.strip())
+        self.assertEqual(len(found), 2, f"expected one checkout per workflow, got {found}")
+        for line in found:
+            self.assertIn(
+                "actions/checkout@v5", line,
+                "checkout was bumped; v6+ moves the credential out of .git/config, "
+                "which is the surface the pre-Fix git guard hashes. Read CLAUDE.md "
+                "before changing this.",
+            )
+
+
 class SecretDiscipline(unittest.TestCase):
     """No secret on any step that executes agent-authored code.
 
@@ -1299,6 +1387,10 @@ class SecretDiscipline(unittest.TestCase):
         "On gate/suite fail, record attempt",
         "Commit + PR",
         "Block + record attempt on review fail",
+        # Its approve-path twin. Same shape and same reason: it posts one
+        # comment and runs no agent-authored code — the reviewer's paragraph
+        # reaches it as data, through jq and the scrubber, never as a command.
+        "Publish review verdict",
         "Merge",
         "Rollback on regression",
         "Record incident",

@@ -131,7 +131,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with: { fetch-depth: 0 }
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with: { python-version: "3.11" }
       # Without an identity, `git commit` and `git revert` abort with
       # "Committer identity unknown". checkout does not set one. That kills the
@@ -598,6 +598,28 @@ jobs:
           PYTHONPATH=.shl python -B -m guardrails.cli scrub --text .shl/reason.raw > .shl/reason.txt
           gh pr comment "$(cat .shl/pr_url.txt)" --body-file .shl/reason.txt
           exit 1
+
+      # The same paragraph on the other verdict. `reason` is the field Review is
+      # told to report prompt injection in, so reading it only when the fix is
+      # BLOCKED means an approval that flags an injected log is heard by nobody
+      # — while the issue_body carrying that injection goes on into incident
+      # memory and is replayed into every later cycle matching the failure.
+      # The evidence bundle holds a copy either way; that is an artifact nobody
+      # downloads on a green cycle, not a channel.
+      - name: Publish review verdict
+        if: success() && steps.rev.outputs.approved == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          jq -er .reason .shl/review.json > .shl/reason.raw
+          # Scrubbed before it is posted, never after: Review quotes the diff
+          # and the issue body back at itself, and both derive from a log this
+          # loop does not trust.
+          PYTHONPATH=.shl python -B -m guardrails.cli scrub --text .shl/reason.raw > .shl/reason.txt
+          # Warn rather than fail. The fix passed both gates, so refusing to
+          # ship it because GitHub rejected a comment trades a real merge for a
+          # cosmetic one — the same call the incident-log push makes below.
+          gh pr comment "$(cat .shl/pr_url.txt)" --body-file .shl/reason.txt || echo "::warning::review verdict comment failed; the reason is still in the evidence bundle"
 
       # 8. Merge synchronously (--auto would race Deploy).
       - name: Merge
