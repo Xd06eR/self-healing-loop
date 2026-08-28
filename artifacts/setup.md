@@ -48,7 +48,9 @@ If a relay was generated, this repo now serves a public, unauthenticated endpoin
 
 **Retention:** `{{RETENTION}}` · **Cron:** `{{CRON}}`
 
-Retention is a hard bound on cadence. If the platform keeps runtime logs for one hour and the cron runs every three, most failures expire unseen and the loop idles looking healthy. `read_log` queries a **fixed** window wider than the interval, and fingerprint dedup absorbs the overlap — it must not watermark from the last run, because that needs `gh` and the step deliberately holds no token.
+Retention is a hard bound on cadence. If the platform keeps runtime logs for one hour and the cron runs every three, most failures expire unseen and the loop idles looking healthy.
+
+Retention bounds the interval from above; **Actions minutes bound it from below.** Every tick is a runner job, and on a private repo those minutes are billed against a monthly allowance — a fifteen-minute cron is ~2,900 ticks a month before a single cycle runs. Check the cadence above against this repo's allowance before enabling it, because the bill is the one failure mode here that nothing in the loop reports. `read_log` queries a **fixed** window wider than the interval, and fingerprint dedup absorbs the overlap — it must not watermark from the last run, because that needs `gh` and the step deliberately holds no token.
 
 ### 5. What deploys this project?
 

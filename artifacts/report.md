@@ -48,7 +48,7 @@ One line per check that actually ran, each naming the command and what it return
 
 ## NOT verified
 
-Normal at install time; listed so it is not mistaken for tested.
+Normal at install time; listed so it is not mistaken for tested. **The first real cycle falsifies most of it** — whoever runs that cycle rewrites this section, or the report starts lying the moment the loop first works.
 
 - **No cycle has ever completed.** The install writes no deliberate defect into this repo, and proving the loop heals needs a failure — so the agent has never been invoked here, the gate has never blocked anything, and the merge path has never run. The dispatched watch exercises checkout, the harness install, dependency install, the adapter import and `read_log`, but **not the agent**: `loop.py watch` constructs none, which is exactly what lets that step withhold the provider token — and on a first install it has commonly not run at all, being reachable only after this install merges, so it belongs under NOT verified until it has. `SETUP.md` § *Optional: prove it actually heals* is how to close this.
 - **`health_check`** when there was nothing live to probe.

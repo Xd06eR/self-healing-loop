@@ -20,6 +20,7 @@ If any of that is unacceptable, do not run this. The loop still works; you simpl
 ## The happy path
 
 - [ ] **Give it something to heal.** One small, self-contained defect in a copy of a real source file, plus a test that fails on it, committed to the install branch. Keep it obvious and local — this is disposable self-test material, not a puzzle. Put it where your log surface will actually record it: a failure nothing logs does not exist to the loop, and the loop will idle looking healthy.
+- [ ] **Make it fail like an error, and confirm the log actually holds it.** Compaction keeps only lines carrying error vocabulary and a trace, so a defect that logs a plain sentence is discarded, the watch reports IDLE, and it reads as a broken loop rather than a badly-shaped probe. Run `read_log()` and see the failure in its output before spending a dispatch.
 - [ ] **Dispatch the watch on that branch**, or use *Actions → sh-watch → Run workflow* and select it.
 
     ```bash

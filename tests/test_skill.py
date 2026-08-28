@@ -350,6 +350,31 @@ class InstallWritesADurableReport(unittest.TestCase):
             "ship into a target as a literal",
         )
 
+    def test_every_section_the_report_sends_the_reader_to_exists(self):
+        """The report cites SETUP.md by section, and both files ship as
+        templates that are edited separately.
+
+        A citation is the operator's only route from "this was not verified" to
+        the procedure that would verify it, so a stale one strands them in
+        their own decision record. Renaming a heading in setup.md is the drift
+        this catches; it does NOT catch an installer omitting the section while
+        filling, which no check here can see.
+        """
+        headings = {
+            line.lstrip("#").strip().lower()
+            for line in setup_text().splitlines()
+            if line.startswith("#")
+        }
+        cited = re.findall(r"`SETUP\.md` § \*([^*]+)\*", REPORT_TEMPLATE.read_text(encoding="utf-8"))
+        self.assertTrue(cited, "the citation form changed; this check now reads nothing")
+        for section in cited:
+            with self.subTest(section=section):
+                self.assertIn(
+                    section.lower(), headings,
+                    f"report.md sends the reader to SETUP.md § {section!r}, "
+                    "which is not a heading in artifacts/setup.md",
+                )
+
 
 class RecordHasAHomeForEveryDecision(unittest.TestCase):
     """The interview asks; the record has to be able to hold the answers.
