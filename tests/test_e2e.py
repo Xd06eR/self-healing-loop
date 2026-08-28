@@ -82,7 +82,7 @@ class TestEndToEndWiring(unittest.TestCase):
         self.assertIn("KeyError", signal)
 
         # Diagnose: reads the signal, returns a valid issue.
-        diag = run_diagnose(self.agent, self.repo, signal)
+        diag = run_diagnose(self.agent, self.repo, signal, signal)
         self.assertEqual(diag["issue_title"], "KeyError on missing key")
         self.assertTrue(diag["reproducible"])
 
@@ -128,7 +128,7 @@ class ContractDriftBetweenStagesSurfacesHere(unittest.TestCase):
         for field in ("issue_body", "reproducible", "confidence"):
             with self.subTest(field=field):
                 with self.assertRaises(ValueError) as caught:
-                    run_diagnose(self._agent_omitting(field), Path("/repo"), "boom")
+                    run_diagnose(self._agent_omitting(field), Path("/repo"), "boom", "boom")
                 self.assertIn(field, str(caught.exception))
 
 

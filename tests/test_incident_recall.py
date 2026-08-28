@@ -27,7 +27,8 @@ from guardrails.incident_memory import (
     record_incident,
     search_similar,
 )
-from log_compact import failure_fingerprints
+from adapters import optional_ids_fn
+from log_compact import compact_log, failure_fingerprints
 from loop import MAX_RECALLED_INCIDENTS, format_incidents, recall_incidents
 
 # A real traceback, as uvicorn writes it. The address and the object id differ
@@ -314,7 +315,7 @@ class ReachesTheAgent(unittest.TestCase):
 
     def test_diagnose_prompt_carries_the_recalled_incident(self):
         context = self._payload_for(
-            lambda: self.loop.run_diagnose(object(), Path("/repo"), LOG_A)
+            lambda: self.loop.run_diagnose(object(), Path("/repo"), LOG_A, LOG_A)
         )
         # Non-empty is the property here: the rendering is ContextBudget's,
         # and asserting the stub's literals through format_incidents would make
@@ -323,7 +324,7 @@ class ReachesTheAgent(unittest.TestCase):
 
     def test_fix_prompt_carries_it_too(self):
         context = self._payload_for(
-            lambda: self.loop.run_fix(object(), Path("/repo"), "issue", "repro", signal=LOG_A)
+            lambda: self.loop.run_fix(object(), Path("/repo"), "issue", "repro", raw_log=LOG_A)
         )
         self.assertTrue(context["incident_memory"])
 
@@ -359,6 +360,7 @@ exit status 2
 """
 
 _STUB_ADAPTER = '''
+import os
 import re
 
 
@@ -366,7 +368,9 @@ class _GoAdapter:
     """Stands in for an installed adapters/target.py on a Go project."""
 
     def read_log(self):
-        return ""
+        # Whatever the test put there, so `loop.py watch` can be driven for
+        # real instead of having its output hand-written by the caller.
+        return os.environ.get("SHL_STUB_LOG", "")
 
     def failure_ids(self, raw_log):
         kind = re.search(r"^panic: (.+?)(?: \\[| with |$)", raw_log, re.MULTILINE)
@@ -432,7 +436,7 @@ class MemoryUsesTheTargetsOwnIdentities(unittest.TestCase):
                 root_cause="slice indexed past its length",
                 fix_commit="abc123",
                 outcome="merged",
-                signal=GO_PANIC,
+                raw_log=GO_PANIC,
                 repo_root="/srv/app",
                 log_path=self.log_path,
             )
@@ -452,7 +456,7 @@ class MemoryUsesTheTargetsOwnIdentities(unittest.TestCase):
                 root_cause="slice indexed past its length",
                 fix_commit="abc123",
                 outcome="reverted",
-                signal=GO_PANIC,
+                raw_log=GO_PANIC,
                 repo_root="/srv/app",
                 log_path=self.log_path,
             )
@@ -471,7 +475,7 @@ class MemoryUsesTheTargetsOwnIdentities(unittest.TestCase):
                 root_cause="slice indexed past its length",
                 fix_commit="abc123",
                 outcome="merged",
-                signal=GO_PANIC,
+                raw_log=GO_PANIC,
                 repo_root="/srv/app",
                 log_path=self.log_path,
             )
@@ -513,13 +517,129 @@ class MemoryUsesTheTargetsOwnIdentities(unittest.TestCase):
             root_cause="state never set",
             fix_commit="def456",
             outcome="merged",
-            signal=LOG_A,
+            raw_log=LOG_A,
             repo_root="/srv/app",
             log_path=self.log_path,
         )
         self.assertIn(
             "#3", recall_incidents(LOG_A_AGAIN, repo_root="/srv/app", log_path=self.log_path)
         )
+
+
+class TheIdentityIsDerivedFromTheRawLog(unittest.TestCase):
+    """Drive the commands `watch.yml` runs, in the order it runs them.
+
+    Every other test in this file hands the identity path a raw panic directly.
+    The workflow does not: it runs `loop.py watch`, which compacts, and the
+    marker sees only what compaction kept. Compaction keeps error lines and
+    their INDENTED continuation, and a Go panic puts its trace behind a blank
+    line and indents none of it — so the frames the adapter keys on are gone
+    before the marker runs. It returns `[]`, `unfingerprintable` reports the
+    failure unreadable, and the cycle is refused. Every tick, forever, on the
+    runtimes this seam exists to serve.
+
+    So the raw log travels to every consumer of an identity, and compaction
+    serves the prompt alone. These pin both halves of that: the raw log
+    arrives intact, and the prompt is still compacted.
+    """
+
+    @contextlib.contextmanager
+    def _go_target(self):
+        prior = os.environ.get("SHL_STUB_LOG")
+        os.environ["SHL_STUB_LOG"] = GO_PANIC
+        try:
+            with go_adapter_installed(), tempfile.TemporaryDirectory() as tmp:
+                yield Path(tmp)
+        finally:
+            if prior is None:
+                os.environ.pop("SHL_STUB_LOG", None)
+            else:
+                os.environ["SHL_STUB_LOG"] = prior
+
+    def _watch(self, raw_path):
+        """`loop.py watch <raw>`: compacted signal returned, raw log written."""
+        import io
+
+        import loop
+
+        captured, sys.stdout = sys.stdout, io.StringIO()
+        try:
+            rc = loop.main(["watch", str(raw_path)])
+            return rc, sys.stdout.getvalue()
+        finally:
+            sys.stdout = captured
+
+    def test_watch_writes_the_uncompacted_log_for_the_identity_path(self):
+        with self._go_target() as tmp:
+            raw = tmp / "signal.raw"
+            rc, _ = self._watch(raw)
+            written = raw.read_text(encoding="utf-8")
+        self.assertEqual(rc, 0)
+        self.assertIn("/srv/app/handler.go:42", written)
+
+    def test_the_marker_reads_that_file_and_keeps_the_adapters_identity(self):
+        import io
+
+        import loop
+
+        with self._go_target() as tmp:
+            raw = tmp / "signal.raw"
+            self._watch(raw)
+            captured, sys.stdout = sys.stdout, io.StringIO()
+            try:
+                rc = loop.main(["fingerprint-marker", str(raw)])
+                out = sys.stdout.getvalue()
+            finally:
+                sys.stdout = captured
+        self.assertEqual(rc, 0, "a stack the adapter can identify was refused")
+        self.assertTrue(any("handler.go:42" in f for f in _marked_fingerprints(out)), out)
+
+    def test_diagnose_recalls_from_the_raw_log_and_not_from_the_signal(self):
+        """The mutation no other test in this suite can catch.
+
+        Every other recall test passes one string as BOTH the signal and the
+        raw log, so swapping `raw_log` for `log` inside `run_diagnose` changes
+        no result anywhere and the whole suite stays green over the defect.
+        Separating them needs a failure whose identity does not survive
+        compaction — which is exactly the case this seam exists for.
+        """
+        import loop
+
+        captured = {}
+        with self._go_target():
+            # The premise, asserted rather than assumed: compaction destroys
+            # this identity and the raw log carries it.
+            self.assertEqual(
+                failure_fingerprints(compact_log(GO_PANIC), ids_fn=optional_ids_fn()), []
+            )
+            self.assertTrue(failure_fingerprints(GO_PANIC, ids_fn=optional_ids_fn()))
+
+            with mock.patch.object(
+                loop, "search_similar",
+                lambda fingerprints, log_path=None: (
+                    [IncidentRecord("42", "t", "prior root cause", "c", "reverted", ["fp"])]
+                    if fingerprints else []
+                ),
+            ), mock.patch.object(
+                loop, "run_role",
+                lambda role, context, agent, cwd: captured.update(context) or {},
+            ), mock.patch.dict(
+                os.environ, {"SHL_REPRO_PATH": "tests/test_repro_issue_{}.py"}
+            ):
+                loop.run_diagnose(object(), Path("/repo"), compact_log(GO_PANIC), GO_PANIC)
+
+        self.assertTrue(
+            captured["incident_memory"],
+            "recall keyed on the compacted signal, which carries no Go identity",
+        )
+
+    def test_what_reaches_the_prompt_is_still_compacted(self):
+        # The other half of the fix. Carrying raw to the identity path must not
+        # send raw to the agent: the size bound is why compaction exists.
+        with self._go_target() as tmp:
+            _, signal = self._watch(tmp / "signal.raw")
+        self.assertIn("panic: runtime error", signal)
+        self.assertNotIn("goroutine 1 [running]:", signal)
 
 
 class RecallStripsTheCheckoutPathWithoutBeingTold(unittest.TestCase):
@@ -572,7 +692,7 @@ class RecallStripsTheCheckoutPathWithoutBeingTold(unittest.TestCase):
 
         with mock.patch.object(_loop, "recall_incidents", spy), \
              mock.patch.dict(os.environ, {"SHL_REPRO_PATH": "tests/t_{}.py"}):
-            _loop.run_diagnose(Stub(), "/some/checkout", log="boom")
+            _loop.run_diagnose(Stub(), "/some/checkout", log="boom", raw_log="boom")
         self.assertTrue(
             seen.get("repo_root"),
             "run_diagnose passed no repo root, so a fingerprint recorded under "

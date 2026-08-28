@@ -227,7 +227,7 @@ class WhatIsCommittedToTheRepoIsScrubbed(unittest.TestCase):
                 root_cause=root_cause,
                 fix_commit="abc123",
                 outcome="merged",
-                signal='TypeError: bad\n  File "/repo/app.py", line 3, in parse\n',
+                raw_log='TypeError: bad\n  File "/repo/app.py", line 3, in parse\n',
                 log_path=log,
             )
             return log.read_text(encoding="utf-8")

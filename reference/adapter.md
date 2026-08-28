@@ -26,6 +26,8 @@ The stable identity of each distinct failure in a log, one string per failure, s
 
 Built-in parsing reads Python tracebacks and V8 stacks. Every other runtime yields error text that produces no identity: a Go panic separates its trace from its message with a blank line and indents none of it, a Ruby backtrace uses its own frame syntax. Issue dedup, the attempt cap, incident recall and the recorded incident all key on this identity.
 
+**It is handed the raw log, never the compacted signal the agent is prompted with.** The workflow carries both: compacted text into the prompt, raw text to everything that derives an identity. So key on whatever the log actually contains — frames, goroutine headers, whatever your runtime prints — without checking whether compaction would have kept it.
+
 **Find out which case this target is in.** Save a real failure log the project has actually produced, then ask the seam the workflow asks:
 
 ```bash

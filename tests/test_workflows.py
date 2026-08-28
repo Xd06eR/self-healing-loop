@@ -1182,6 +1182,70 @@ class IssueDedupIsFingerprintKeyed(unittest.TestCase):
         self.assertIn("loop.py fingerprint-marker", self.code)
 
 
+class EveryIdentityIsDerivedFromTheRawLog(unittest.TestCase):
+    """The workflow must hand the identity commands the RAW log, never the signal.
+
+    `loop.py` is proven to key correctly on whatever text it is given, so the
+    only place this defect can now live is the argument. Compaction keeps error
+    lines and their INDENTED continuation; a Go panic puts its trace behind a
+    blank line and indents none of it, so identifying from `signal.txt` hands a
+    target's `failure_ids` a message with no frames. It returns `[]`, the cycle
+    is refused as unfingerprintable, and the loop stalls on every tick — on
+    exactly the runtimes the seam exists to serve.
+
+    Pinned at the workflow because that is the seam the product crosses. Every
+    Python test stays green with `signal.txt` written here, which is this
+    project's recurring failure: verified at a seam the product does not use.
+    """
+
+    # command -> the file it must be given. `diagnose` takes both: the signal
+    # is what the AGENT reads and is bounded on purpose.
+    IDENTITY_COMMANDS = ("fingerprint-marker", "find-issue")
+
+    def _runs(self, workflow):
+        # Comments stripped: every rule below is stated in a comment beside the
+        # command it governs, so a raw-text check reads its own documentation.
+        return executable((WORKFLOWS / workflow).read_text(encoding="utf-8"))
+
+    def test_no_identity_command_is_handed_the_compacted_signal(self):
+        checked = 0
+        for workflow in ("watch.yml", "heal.yml"):
+            for line in self._runs(workflow).splitlines():
+                for command in self.IDENTITY_COMMANDS:
+                    if f"loop.py {command}" in line:
+                        checked += 1
+                        with self.subTest(workflow=workflow, command=command):
+                            self.assertNotIn(
+                                "signal.txt", line, f"{command} keys on compacted text: {line}"
+                            )
+                            self.assertIn("signal.raw", line, line)
+        # Refuse to pass vacuously: with the commands renamed or removed the
+        # loop above never runs, and a check that examined nothing reads
+        # exactly like one that examined everything (L8).
+        self.assertEqual(checked, 3, "expected find-issue once and the marker twice")
+
+    def test_watch_is_asked_to_write_the_raw_log(self):
+        # Nothing else produces it, so a `watch` invocation with no path leaves
+        # every consumer below reading a file that does not exist.
+        for workflow in ("watch.yml", "heal.yml"):
+            with self.subTest(workflow=workflow):
+                self.assertIn("loop.py watch signal.raw", self._runs(workflow))
+
+    def test_diagnose_gets_both_and_fix_gets_the_raw_log(self):
+        heal = self._runs("heal.yml")
+        self.assertIn("loop.py diagnose signal.txt signal.raw", heal)
+        self.assertRegex(heal, r"loop\.py fix \"\$\{\{[^}]*\}\}\" signal\.raw")
+
+    def test_the_recorded_incident_is_keyed_from_the_raw_log(self):
+        # The other half of the round trip. A record written from compacted text
+        # carries fewer identities than the recall derives, so the repeat this
+        # record exists to catch never matches it — and both halves look correct
+        # read on their own.
+        record = step_chunk("heal.yml", "Record incident")
+        self.assertIn("raw_log=open('.shl/signal.raw')", record)
+        self.assertNotIn("signal.txt", record)
+
+
 class SecretDiscipline(unittest.TestCase):
     """No secret on any step that executes agent-authored code.
 

@@ -40,6 +40,15 @@ class TargetAdapter(ABC):
     def failure_ids(self, raw_log: str) -> Optional[list[str]]:
         """Stable identity of each distinct failure in ``raw_log``, in order.
 
+        **The text is the raw log `read_log` returned, never the compacted
+        signal the agent is prompted with.** That guarantee is the method's
+        whole basis: compaction keeps error lines and their *indented*
+        continuation, which drops a Go panic's trace entirely — it sits behind
+        a blank line and is not indented. Deriving identity from compacted text
+        would hand this method a message with no frames, on precisely the
+        runtimes it exists to serve, so the workflow carries the raw log to
+        every consumer of an identity and compacts only for the prompt.
+
         Optional, and needed by any runtime the framework cannot read: it
         understands Python tracebacks and V8 stacks, and nothing else. A Go
         panic separates its trace from its message with a blank line and

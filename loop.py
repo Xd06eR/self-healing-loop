@@ -99,8 +99,13 @@ def format_incidents(matches: list) -> str:
     return "\n".join(lines)
 
 
-def recall_incidents(log: str, repo_root: str = "", log_path: Path = DEFAULT_LOG_PATH) -> str:
-    """Prior incidents for the failures present in ``log``, formatted for a prompt.
+def recall_incidents(raw: str, repo_root: str = "", log_path: Path = DEFAULT_LOG_PATH) -> str:
+    """Prior incidents for the failures present in ``raw``, formatted for a prompt.
+
+    ``raw`` is the log as ``read_log`` returned it, never the compacted signal:
+    identities are derived from frames compaction is free to drop, and a lookup
+    keyed on less than the record was written with matches nothing while
+    reporting success.
 
     Keyed on failure fingerprints, never on the issue title: the title is prose
     a model writes fresh each cycle, so it differs even for an identical repeat.
@@ -108,7 +113,7 @@ def recall_incidents(log: str, repo_root: str = "", log_path: Path = DEFAULT_LOG
     two halves of memory cannot key a failure differently. Empty string when
     nothing matches, which is the common case and the correct one.
     """
-    prints = failure_fingerprints(log, strip_prefix=repo_root, ids_fn=optional_ids_fn())
+    prints = failure_fingerprints(raw, strip_prefix=repo_root, ids_fn=optional_ids_fn())
     return format_incidents(search_similar(prints, log_path=log_path))
 
 
@@ -125,14 +130,29 @@ def build_agent_from_env(
     return ConfiguredAgent(harness, model, runner=runner, evidence_dir=evidence_dir)
 
 
-def run_watch(adapter) -> str:
+def run_watch(adapter, raw_out: Path | None = None) -> str:
     """Read the target's log, return compacted signal. Empty string = idle.
+
+    ``raw_out`` receives the log exactly as read. Everything that derives a
+    failure IDENTITY reads that file rather than the signal, and the split is
+    load-bearing: compaction keeps error lines plus their INDENTED
+    continuation, while a Go panic puts its trace behind a blank line and
+    indents none of it. Identifying from compacted text therefore hands
+    ``TargetAdapter.failure_ids`` a message with no frames, on precisely the
+    runtimes that method exists to serve — it returns ``[]``, the cycle is
+    refused as unfingerprintable, and the loop stalls on every tick forever.
+
+    One ``read_log`` call serves both, because on most targets it is a network
+    request against the host's log API.
 
     The prompt budget belongs to ``compact_log``; restating its default here
     gave two places one number, and changing the real one would have left this
     on the old value.
     """
-    return compact_log(adapter.read_log())
+    raw = adapter.read_log()
+    if raw_out is not None:
+        raw_out.write_text(raw, encoding="utf-8")
+    return compact_log(raw)
 
 
 def _repo_root(repo_path) -> str:
@@ -182,30 +202,37 @@ def repro_path(issue_number) -> str:
     return _repro_path_pattern().replace("{}", str(issue_number))
 
 
-def run_diagnose(agent, repo_path, log: str) -> dict:
+def run_diagnose(agent, repo_path, log: str, raw_log: str) -> dict:
     """Diagnose the failure in ``log``, with any prior incidents for it recalled.
 
-    The recall is computed here from the signal rather than taken as a
-    parameter. Otherwise every caller has to derive the lookup key the same way,
-    and one that derives it differently recalls nothing while reporting success:
-    the mechanism is dead on the path that ships, with no symptom anywhere. A
-    caller cannot get this wrong because it cannot supply it.
+    Two views of one failure, and they are not interchangeable. ``log`` is the
+    compacted signal, which is what the agent reads: bounded, one slot per
+    distinct failure. ``raw_log`` is what came off the target, and it is what
+    the recall keys on, because a fingerprint is built from frames compaction
+    is free to drop.
+
+    The recall is still computed here rather than taken as a parameter.
+    Otherwise every caller has to derive the lookup key the same way, and one
+    that derives it differently recalls nothing while reporting success: the
+    mechanism is dead on the path that ships, with no symptom anywhere. Handing
+    in the source text is safe in a way handing in the KEY is not — there is
+    still exactly one derivation, and it lives here.
     """
     return run_role(
         AgentRole.DIAGNOSE,
         {
             "log": log,
             "repro_path": _repro_path_pattern(),
-            "incident_memory": recall_incidents(log, _repo_root(repo_path)),
+            "incident_memory": recall_incidents(raw_log, _repo_root(repo_path)),
         },
         agent,
         _agent_cwd(repo_path),
     )
 
 
-def run_fix(agent, repo_path, issue: str, repro: str, signal: str = "",
+def run_fix(agent, repo_path, issue: str, repro: str, raw_log: str = "",
             issue_number: str = "") -> dict:
-    """``signal`` is the cycle's compacted log — the same key Diagnose recalled on.
+    """``raw_log`` is the cycle's uncompacted log — the same key Diagnose recalled on.
 
     The frozen path is COMPUTED here from the issue number rather than accepted
     as a parameter, for the reason L9 records: two drivers given the same rule
@@ -237,7 +264,7 @@ def run_fix(agent, repo_path, issue: str, repro: str, signal: str = "",
             "issue": issue,
             "repro": repro if has_repro else "",
             "frozen": repro_path(issue_number) if issue_number and has_repro else "",
-            "incident_memory": recall_incidents(signal, _repo_root(repo_path)),
+            "incident_memory": recall_incidents(raw_log, _repo_root(repo_path)),
         },
         agent,
         _agent_cwd(repo_path),
@@ -315,6 +342,26 @@ def _read_arg_or_stdin(args: list[str]) -> str:
     return read_text_arg(args[1] if len(args) > 1 else None)
 
 
+def _raw_log_arg(args: list[str], index: int, cmd: str) -> str | None:
+    """The uncompacted log at ``args[index]``, or None after reporting why not.
+
+    Refused rather than defaulted to the compacted signal. That default is
+    available, reads as harmless, and silently reinstates the whole defect:
+    recall would key on frames the record was never written with, match
+    nothing, and report an empty recall — which is what a project that has
+    never failed twice looks like. A missing argument is a wiring error and
+    says so.
+    """
+    if len(args) > index:
+        return read_text_arg(args[index])
+    sys.stderr.write(
+        f"{cmd} needs the RAW log path as argument {index}. Incident recall keys "
+        "on failure identities derived from frames the compacted signal does not "
+        "carry, so recalling from the signal matches nothing and says nothing.\n"
+    )
+    return None
+
+
 def main(argv: list[str] | None = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
     if not args:
@@ -326,7 +373,8 @@ def main(argv: list[str] | None = None) -> int:
     # watch runs no agent, so it needs no provider token in env — keeping the
     # agent lazy lets the workflow withhold SHL_AUTH_TOKEN from the watch step.
     if cmd == "watch":
-        signal = run_watch(load_adapter())
+        raw_out = Path(args[1]) if len(args) > 1 else None
+        signal = run_watch(load_adapter(), raw_out)
         print(signal if signal else "IDLE")
         return 0
 
@@ -370,13 +418,19 @@ def main(argv: list[str] | None = None) -> int:
     agent = build_agent_from_env(os.environ, evidence_dir=evidence)
     if cmd == "diagnose":
         log = _read_arg_or_stdin(args)
+        raw_log = _raw_log_arg(args, 2, cmd)
+        if raw_log is None:
+            return 2
         record_artifact(evidence, "signal.txt", log)
-        payload = run_diagnose(agent, repo, log)
+        payload = run_diagnose(agent, repo, log, raw_log)
         record_json(evidence, "diagnose.json", payload)
         print(json.dumps(payload))
         return 0
     if cmd == "fix":
         issue_n = int(args[1])
+        raw_log = _raw_log_arg(args, 2, cmd)
+        if raw_log is None:
+            return 2
         if not under_attempt_cap(issue_n):
             payload = {"escalate": True, "reason": "attempt cap reached"}
             record_json(evidence, "fix.json", payload)
@@ -387,11 +441,7 @@ def main(argv: list[str] | None = None) -> int:
         diagnose = json.loads(Path("diagnose.json").read_text(encoding="utf-8"))
         issue = diagnose.get("issue_body", "")
         repro = frozen_repro(diagnose)
-        # Recall on the same key Diagnose used: the signal this cycle opened
-        # with, not the issue title Diagnose wrote (prose, matches nothing).
-        signal_path = evidence / "signal.txt"
-        signal = signal_path.read_text(encoding="utf-8") if signal_path.exists() else ""
-        payload = run_fix(agent, repo, issue, repro, signal=signal, issue_number=args[1])
+        payload = run_fix(agent, repo, issue, repro, raw_log=raw_log, issue_number=args[1])
         record_json(evidence, "fix.json", payload)
         print(json.dumps(payload))
         return 0

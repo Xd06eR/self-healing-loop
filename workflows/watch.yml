@@ -118,7 +118,7 @@ jobs:
           # reference/closing-gaps.md, "The credential trap".
           SHL_LOG_TOKEN: ${{ secrets.SHL_LOG_TOKEN }}
         run: |
-          signal="$(python -B loop.py watch)"
+          signal="$(python -B loop.py watch signal.raw)"
           if [ "$signal" = "IDLE" ]; then
             echo "signal=false" >> "$GITHUB_OUTPUT"
             echo "idle — nothing to heal"
@@ -132,7 +132,7 @@ jobs:
             #
             # And before the output is written, so the refusal is what stops the
             # dispatch rather than GitHub's implicit success() on the step.
-            python -B loop.py fingerprint-marker signal.txt > /dev/null
+            python -B loop.py fingerprint-marker signal.raw > /dev/null
             echo "signal=true" >> "$GITHUB_OUTPUT"
           fi
       - name: Dispatch heal

@@ -188,7 +188,7 @@ jobs:
         env:
           SHL_LOG_TOKEN: ${{ secrets.SHL_LOG_TOKEN }}
         run: |
-          signal="$(python -B loop.py watch)"
+          signal="$(python -B loop.py watch signal.raw)"
           if [ "$signal" = "IDLE" ]; then echo "go=false" >> "$GITHUB_OUTPUT"; exit 0; fi
           printf '%s' "$signal" > signal.txt
           echo "go=true" >> "$GITHUB_OUTPUT"
@@ -227,7 +227,7 @@ jobs:
         working-directory: .shl
         env:
           SHL_AUTH_TOKEN: ${{ secrets.SHL_AUTH_TOKEN }}
-        run: python -B loop.py diagnose signal.txt > diagnose.json
+        run: python -B loop.py diagnose signal.txt signal.raw > diagnose.json
 
       # Dedupe issue FIRST (before the red check), so a persistently-bad repro
       # spec reuses one issue instead of spamming a new one every cycle.
@@ -247,7 +247,7 @@ jobs:
           # to zero so the attempt cap can never fire. Incident memory keys on
           # the same fingerprints through the same code path, for the same
           # reason.
-          existing="$(PYTHONPATH=.shl python -B .shl/loop.py find-issue .shl/signal.txt)"
+          existing="$(PYTHONPATH=.shl python -B .shl/loop.py find-issue .shl/signal.raw)"
           if [ -n "$existing" ]; then
             echo "number=$existing" >> "$GITHUB_OUTPUT"
             gh issue comment "$existing" --body "🤖 re-detected"
@@ -256,7 +256,7 @@ jobs:
             PYTHONPATH=.shl python -B -m guardrails.cli scrub --text .shl/body.raw > .shl/body.txt
             # The marker is what the next cycle recognises. It is an HTML
             # comment, so it is invisible in the rendered issue.
-            PYTHONPATH=.shl python -B .shl/loop.py fingerprint-marker .shl/signal.txt >> .shl/body.txt
+            PYTHONPATH=.shl python -B .shl/loop.py fingerprint-marker .shl/signal.raw >> .shl/body.txt
             url="$(gh issue create --title "$title" --body-file .shl/body.txt)"
             echo "number=${url##*/}" >> "$GITHUB_OUTPUT"
           fi
@@ -377,7 +377,7 @@ jobs:
           SHL_AUTH_TOKEN: ${{ secrets.SHL_AUTH_TOKEN }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          python -B loop.py fix "${{ steps.issue.outputs.number }}" > fix.json
+          python -B loop.py fix "${{ steps.issue.outputs.number }}" signal.raw > fix.json
           if jq -e '.escalate' fix.json >/dev/null; then
             gh issue comment "${{ steps.issue.outputs.number }}" --body "🤖 escalated to human: attempt cap reached"
             echo "escalated=true" >> "$GITHUB_OUTPUT"
@@ -866,7 +866,7 @@ jobs:
           record_cycle(issue_id='${{ steps.issue.outputs.number }}', \
           signature=d['issue_title'], root_cause=d.get('issue_body',''), \
           fix_commit='$(git rev-parse HEAD)', outcome='$outcome', \
-          signal=open('.shl/signal.txt').read(), repo_root=os.getcwd())"
+          raw_log=open('.shl/signal.raw').read(), repo_root=os.getcwd())"
           git add .shl/incident_memory/log.jsonl
           git commit -m "record incident #${{ steps.issue.outputs.number }} ($outcome)" || true
           git push || echo "::warning::incident log push failed (branch protection?); memory not persisted this cycle"

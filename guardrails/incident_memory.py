@@ -98,11 +98,18 @@ def record_cycle(
     root_cause: str,
     fix_commit: str,
     outcome: str,
-    signal: str,
+    raw_log: str,
     repo_root: str = "",
     log_path: Path = DEFAULT_LOG_PATH,
 ) -> IncidentRecord:
-    """Record a completed cycle, fingerprinting its signal.
+    """Record a completed cycle, fingerprinting its log.
+
+    ``raw_log`` is the log as the adapter returned it, not the compacted
+    signal: what is stored has to be derived from the same text a later
+    `recall_incidents` will look up with, and identities are built from frames
+    compaction is free to drop. Recording from compacted text stores fewer
+    identities than the lookup derives, so the repeat this record exists to
+    catch never matches it.
 
     One implementation, called rather than reimplemented: a caller that builds
     the record inline has to derive the fingerprint rule itself, and a rule two
@@ -131,7 +138,7 @@ def record_cycle(
         fix_commit=fix_commit,
         outcome=outcome,
         fingerprints=failure_fingerprints(
-            signal, strip_prefix=repo_root, ids_fn=optional_ids_fn()
+            raw_log, strip_prefix=repo_root, ids_fn=optional_ids_fn()
         ),
     )
     record_incident(entry, log_path=log_path)

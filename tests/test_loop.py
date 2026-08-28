@@ -507,7 +507,7 @@ class RunFixWithoutAnIssueNumber(unittest.TestCase):
                 Stub(), ".",
                 issue=json.dumps(payload),
                 repro=loop.frozen_repro(payload),
-                signal="",
+                raw_log="",
             )
         # The HEADING, not the phrase — fix.md's standing prose says "frozen".
         self.assertNotIn("### FROZEN", prompts[0])
@@ -563,7 +563,8 @@ class TheDiagnosePromptCarriesItsWholeContext(unittest.TestCase):
 
         env = {"SHL_REPRO_PATH": "tests/test_issue_{}.py", **env_overrides}
         with mock.patch.dict(os.environ, env):
-            loop.run_diagnose(Stub(), ".", log="Traceback: ValueError at app/x.py:12")
+            loop.run_diagnose(Stub(), ".", log="Traceback: ValueError at app/x.py:12",
+                              raw_log="Traceback: ValueError at app/x.py:12")
         return prompts[0]
 
     # The three values run_diagnose supplies; every other key in
@@ -614,8 +615,9 @@ class TheDashInvocationWorksThroughMain(unittest.TestCase):
         def fake_agent(*a, **k):
             return object()
 
-        def fake_diagnose(agent, repo, log):
+        def fake_diagnose(agent, repo, log, raw_log):
             self.captured["log"] = log
+            self.captured["raw_log"] = raw_log
             return {"issue_title": "t", "issue_body": "b", "reproducible": False,
                     "confidence": "low"}
 
@@ -651,7 +653,8 @@ class TheDashInvocationWorksThroughMain(unittest.TestCase):
 
     def _run(self, argv, piped):
         with mock.patch("sys.stdin", io.StringIO(piped)), \
-             mock.patch("sys.stdout", io.StringIO()):
+             mock.patch("sys.stdout", io.StringIO()), \
+             mock.patch("sys.stderr", io.StringIO()):
             return loop.main(argv)
 
     def test_review_dash_pipes_the_diff_through_to_the_reviewer(self):
@@ -660,9 +663,23 @@ class TheDashInvocationWorksThroughMain(unittest.TestCase):
         self.assertEqual(self.captured["diff"], "+ the actual diff\n")
 
     def test_diagnose_dash_pipes_the_log_through_to_diagnose(self):
-        rc = self._run(["diagnose", "-"], "TypeError: boom\n")
+        # Two arguments now: the signal the agent reads, and the raw log the
+        # recall keys on. The signal still honours the shared dash convention.
+        raw = Path(self.tmp) / "signal.raw"
+        raw.write_text("TypeError: boom\n  frame\n", encoding="utf-8")
+        rc = self._run(["diagnose", "-", str(raw)], "TypeError: boom\n")
         self.assertEqual(rc, 0)
         self.assertEqual(self.captured["log"], "TypeError: boom\n")
+        self.assertEqual(self.captured["raw_log"], "TypeError: boom\n  frame\n")
+
+    def test_diagnose_without_a_raw_log_refuses_instead_of_recalling_on_the_signal(self):
+        # Fail closed. Falling back to the signal is available and silent: the
+        # recall would key on fewer identities than the record was written
+        # with, match nothing, and be indistinguishable from a project that has
+        # never failed twice.
+        rc = self._run(["diagnose", "-"], "TypeError: boom\n")
+        self.assertEqual(rc, 2)
+        self.assertNotIn("log", self.captured)
 
     def test_review_still_accepts_a_real_path(self):
         with tempfile.TemporaryDirectory() as tmp:
