@@ -360,11 +360,17 @@ class InstallWritesADurableReport(unittest.TestCase):
         this catches; it does NOT catch an installer omitting the section while
         filling, which no check here can see.
         """
-        headings = {
-            line.lstrip("#").strip().lower()
-            for line in setup_text().splitlines()
-            if line.startswith("#")
-        }
+        # Fence tracking, because a heading cannot live inside a fence and
+        # setup.md's gh block is full of column-0 shell comments. Matching
+        # `^#{1,6} ` alone is NOT enough: `# Optional: …` as a bash comment
+        # satisfies it too, so a renamed section stays "resolved" by a comment.
+        # That mutation survived the regex-only version of this check.
+        headings, in_fence = set(), False
+        for line in setup_text().splitlines():
+            if line.lstrip().startswith("```"):
+                in_fence = not in_fence
+            elif not in_fence and re.match(r"^#{1,6} ", line):
+                headings.add(line.lstrip("#").strip().lower())
         cited = re.findall(r"`SETUP\.md` § \*([^*]+)\*", REPORT_TEMPLATE.read_text(encoding="utf-8"))
         self.assertTrue(cited, "the citation form changed; this check now reads nothing")
         for section in cited:
@@ -430,11 +436,17 @@ class TheTwoVerificationProceduresStayInStep(unittest.TestCase):
         # A probe worded as plain prose is discarded by the compactor, the
         # watch reports IDLE, and it reads as a broken loop. Costs two rounds
         # of debugging the wrong thing.
+        # Scoped to the CHECKLIST, not the document. A whole-file search passes
+        # as soon as the phrase appears anywhere — so deleting the step and
+        # mentioning "error vocabulary" in unrelated prose keeps this green
+        # while the operator loses the instruction. Same defect the sibling
+        # method above exists to avoid; proven by mutation, not reasoned.
         for rel, text in self._sources():
+            steps = [ln for ln in text.splitlines() if ln.lstrip().startswith("- [ ]")]
             with self.subTest(doc=rel):
-                self.assertRegex(
-                    text, r"(?i)error vocabulary",
-                    "this copy does not tell the operator the seeded failure has "
+                self.assertTrue(
+                    any(re.search(r"(?i)error vocabulary", ln) for ln in steps),
+                    "no checklist step tells the operator the seeded failure has "
                     "to carry error vocabulary, so a valid probe reads as a dead loop",
                 )
 
