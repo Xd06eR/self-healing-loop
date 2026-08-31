@@ -241,9 +241,9 @@ Both required, neither needs a runner; backfill `{{VERIFIED}}` in `SETUP.md`:
 
 Phase 2 approved a plan. This approves **code an agent wrote into the operator's repo**, which is a different thing: consent to "generate a test suite" is not consent to *these* assertions.
 
-The PR from Phase 8 is the gate, and a real diff is the right place for it. **If Phase 5a generated a test suite, the review must include reading it.** Ask for that explicitly rather than assuming it was inferred from a file list.
+The PR from Phase 8 is that gate, and a real diff is the right place for it. **If Phase 5a generated a test suite, the review must include reading it.** Ask for it explicitly rather than assuming it was inferred from a file list.
 
-Say why. The gate is a done-criterion **plus a boundary**: the frozen repro test flips red to green, and nothing was weakened, deleted or reconfigured to get it there. Without the boundary, "make the tests pass" is an instruction to delete tests. Those generated assertions are the boundary, and an unread one is a gate certifying its own author's work.
+Say why. A merge gate is a done-criterion **plus a boundary**: the frozen repro test flips red to green, and nothing was weakened, deleted or reconfigured to get it there. Without the boundary, "make the tests pass" is an instruction to delete tests. Those generated assertions are the boundary, and an unread one is a gate certifying its own author's work.
 
 The operator reviews and merges. Record whether a fresh context audited that suite or they declined — a safeguard nobody can tell was skipped is not one.
 

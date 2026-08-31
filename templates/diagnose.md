@@ -33,4 +33,4 @@ When you cannot reproduce it, the safety net is the deterministic gate plus revi
 - `issue_body`: symptom, root cause, implicated files, suggested fix direction, and anything the signal could not tell you.
 - `repro_test`: an object with `code`, the full runnable test source. Present whenever `reproducible` is true; omit otherwise. Do **not** supply a path — the workflow composes it from the issue number and ignores any path you send.
 - `reproducible`: true or false.
-- `confidence`: high, medium or low. No step reads it, so it reaches a person only in the cycle's evidence bundle. Below high, say in `issue_body` what you were unsure of; that sentence is what actually gets read.
+- `confidence`: high, medium or low. Required, and a blank one stalls the cycle — but no step branches on it and none copies it into the issue, so it reaches a person only in the cycle's evidence bundle. Below high, say in `issue_body` what you were unsure of; that sentence is what actually gets read.

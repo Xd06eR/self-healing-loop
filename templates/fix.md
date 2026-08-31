@@ -22,7 +22,7 @@ The gate runs the moment you finish, and it is deterministic. Routing around it 
 - **Never leave a test file unreadable as text.** The check reads the `+` and `-` lines of your diff to see whether an assertion was removed, and one NUL byte anywhere in the file makes git render it as binary. Keep binary fixtures in files of their own.
 - **No test that was passing may fail after your change** — the gate refuses that as a regression.
 
-A test that was already failing when you started is not yours to fix and does not block you, and the gate refuses separately when the suite could not run at all: a non-zero exit with no failing test parsed anywhere, which is a broken install and equally not yours. Either way, say so in your summary rather than widening the diff.
+Whether a test that was ALREADY failing when you started blocks you depends on this target. Where the project can list its failing tests, the gate compares the failure set before and after, so a pre-existing failure is not yours to fix and does not stop your fix. Where it cannot, the gate falls back to demanding a fully green suite and a pre-existing failure blocks every fix including yours — a broken install rather than anything you can repair. The gate refuses separately when the suite could not run at all: a non-zero exit with no failing test parsed anywhere, which is that same broken install seen from the other side. In every one of those cases, say so in your summary rather than widening the diff.
 
 If incident memory shows this signature was fixed before and later reverted, that approach is known-bad. Find a different root cause.
 

@@ -12,7 +12,7 @@ One home per fact. Put new content in the file that owns the topic; the others l
 | depth | [`docs/architecture.md`](docs/architecture.md) | changing a seam | the adapter contracts, harness restriction, the installer's tier rule |
 | depth | [`docs/subsystems.md`](docs/subsystems.md) | changing a module | compaction, failure identity, incident memory, evidence, variable hydration, gate internals |
 | depth | [`docs/risks.md`](docs/risks.md) | judging what the design does not cover | residual risks outside the workflows |
-| subtree | [`workflows/CLAUDE.md`](workflows/CLAUDE.md) | editing `heal.yml` or `watch.yml` | secret discipline, the git guard, action pins |
+| subtree | [`workflows/CLAUDE.md`](workflows/CLAUDE.md) | editing `heal.yml` or `watch.yml` | the git guard, the action and harness pins, branch behaviour |
 | subtree | [`tests/CLAUDE.md`](tests/CLAUDE.md) | writing or reading a test | mutation discipline, what actually backs this code |
 | shipped | `README.md` · `SKILL.md` · `reference/` · `artifacts/` · `templates/` · `loop_context/CLAUDE.md` | evaluators, the installing agent, the loop's roles | not development docs; see *Layout* |
 
@@ -48,7 +48,7 @@ The repo name `self-healing-loop` matches the skill's `name:` and the `SHL_*` en
 
 Watch → Triage (compact the log; idle if nothing) → Diagnose (read-only) → Red and Freeze (write the repro test, prove RED, freeze it) → Fix (source-only, no shell) → Gate → PR → Review (read-only) → Merge → Deploy (only with a deploy command) → Verify (always, auto-revert on regression) → Record.
 
-The gate refuses in this order: loop tree untouched **first**, workflows untouched, `.gitattributes` untouched, no test weakened, no test-config touched, then, only when a frozen test exists, frozen untouched and its neighbours untouched. Plus no NEW failures.
+The gate refuses in this order, and the order is load-bearing — a violation of reach is named before a violation of content: `loop tree untouched`, `workflow untouched`, `diff rendering untouched` (a `.gitattributes` that blinds every content check), `test content readable` (the same blinding by a route that leaves no diff at all: `core.attributesFile`, or one NUL byte), `no test weakened`, `no test config touched`, then, only when a frozen test exists, `frozen test untouched` and `frozen test's helpers untouched`. Plus `no test that was passing now fails`.
 
 **Every gate verdict states its grounds.** A refusal names the check, the file and the evidence (`BLOCKED [no test weakened]: tests/x.py: assertion removed: assert f() == 1`); a pass names the checks it rested on. Without it an empty `gate.txt` means both "passed" and "blocked".
 
@@ -56,7 +56,7 @@ The gate refuses in this order: loop tree untouched **first**, workflows untouch
 
 **Auto-merge is unconditional.** `heal.yml` runs Merge, Deploy, Verify, Rollback and Record as sequential steps in one job, so a mode that stopped at the PR would remove post-deploy verification, auto-rollback and the incident record with it. A protected default branch with no bot bypass is therefore a Phase 0 blocking check: without one, every cycle spends three agent calls and dies at the merge. An operator who cannot accept unattended merges sets `SHL_DEPLOY_CMD` empty and keeps the loop off that service.
 
-Verify is not gated on `SHL_DEPLOY_CMD`, and the step says why. Its suite half runs on every ref, but the `health_check` probe runs **only on the default branch**: `SHL_HEALTH_URL` names one deployment, so probing it from a branch cycle reads a different commit and reverts a correct fix as a regression.
+Verify is not gated on `SHL_DEPLOY_CMD`, and the step says why. Its suite half runs on every ref while the `health_check` probe runs only on the default branch; branch behaviour and the reason for that split are in [`workflows/CLAUDE.md`](workflows/CLAUDE.md).
 
 ## The two seams
 
@@ -90,4 +90,4 @@ PYTHONPATH=. python3 -B -m unittest discover -s tests -v
 actionlint -no-color -oneline workflows/*.yml
 ```
 
-All green, or the change is not done. `actionlint` is a **required manual step before any release**: the suite's schema check is guarded by `shutil.which`, so without the binary it skips and still reports `OK`. Why that skip is deliberate, and what evidence actually backs this code: [`tests/CLAUDE.md`](tests/CLAUDE.md).
+All green, or the change is not done. **`actionlint` is a required manual step before any release**, because the suite cannot substitute for it. Why not, and what evidence actually backs this code: [`tests/CLAUDE.md`](tests/CLAUDE.md).

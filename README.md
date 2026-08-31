@@ -91,6 +91,8 @@ There is no headless install **by design**. Fitting a loop to a project settles 
 - **`reference/`** — what the installer *reads*, loaded only on the branch it is on: `adapter.md` (which adapter methods this target needs), `harnesses.md` (the two harnesses and their credential paths), `platforms.md` (log surfaces, retention, per-platform recipes), `closing-gaps.md` (generating a test suite or an error relay), `updating.md` (refreshing a loop that is already installed), and `verifying-the-install.md`, which it reads only when asked and never runs.
 - **`artifacts/`** — what the installer *produces*: `setup.md` becomes the target's decision record, `report.md` becomes its install report, and `readme.md` becomes the `README.md` inside the loop directory for whoever meets it without expecting it. Filled in and copied; none is vendored.
 - **`templates/`** — the three role prompts (diagnose, fix, review) the loop uses at runtime. Vendored whole.
-- **`CLAUDE.md`** / **`AGENTS.md`** — dev guide (architecture, lessons, testing) for anyone working ON the framework.
+- **`CLAUDE.md`** / **`AGENTS.md`** — the development guide for anyone working ON the framework: what it is, the loop, hard rules, and a map to everything below.
+- **`docs/`** — development depth reached from that map: `architecture.md` (the adapter seams, harness restriction, the installer's determine-versus-ask rule), `subsystems.md` (compaction, failure identity, incident memory, evidence, the gate's internals) and `risks.md` (what the design does not cover).
+- **`workflows/CLAUDE.md`** and **`tests/CLAUDE.md`** — orders for those two directories, loaded when an agent works in them.
 - **`loop_context/CLAUDE.md`** — the operating doc copied into each target for the loop's own agent.
 - This README — human overview.
