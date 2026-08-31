@@ -26,6 +26,8 @@ The stable identity of each distinct failure in a log, one string per failure, s
 
 Built-in parsing reads Python tracebacks and V8 stacks. Every other runtime yields error text that produces no identity: a Go panic separates its trace from its message with a blank line and indents none of it, a Ruby backtrace uses its own frame syntax. Issue dedup, the attempt cap, incident recall and the recorded incident all key on this identity.
 
+**What you return is published, and it is not redacted for you.** The identity goes into the dedup marker on a GitHub issue and into the incident log the loop commits to the default branch. Running it through the scrubber is not an option: `panic@handler.go:42` is exactly the shape of an email address, so redaction would rewrite it and collapse every distinct failure onto one key. Key on the type and the frame; never let the message payload into the string. That is the same rule as "stable" below, seen from the other side — a value that varies between two occurrences of one bug is also a value carrying whatever the log happened to put there.
+
 **It is handed the raw log, never the compacted signal the agent is prompted with.** The workflow carries both: compacted text into the prompt, raw text to everything that derives an identity. So key on whatever the log actually contains — frames, goroutine headers, whatever your runtime prints — without checking whether compaction would have kept it.
 
 **Find out which case this target is in.** Save a real failure log the project has actually produced, then ask the seam the workflow asks:

@@ -28,6 +28,7 @@ TypeError: Cannot read properties of undefined (reading 'map')
     at node:internal/main/run_main_module:36:49
 """
 
+from gh_state import _marked_fingerprints, fingerprint_marker
 from log_compact import compact_log, failure_fingerprints, unfingerprintable
 
 
@@ -519,6 +520,123 @@ class AGenericLogLevelIsNotAnIdentity(unittest.TestCase):
             "Traceback (most recent call last):\n" + self.FRAME + "KeyError: 'x'\n"
         )
         self.assertNotEqual(a, b)
+
+
+class AFingerprintIsAnIdentityNotALogLine(unittest.TestCase):
+    """The type half of a fingerprint must be a TYPE, not everything before a colon.
+
+    `_EXC_LINE_RE` matches any line beginning with the word `Error` or
+    `Exception`, which includes ordinary prose an application logs. Taking
+    `split(":", 1)[0]` from such a line yields the whole line, and that is two
+    defects at once.
+
+    It is an unstable identity: `Error refreshing token for user alice` and the
+    same failure for `bob` fingerprint differently, so dedup misses, a fresh
+    issue opens every tick, and the attempt cap counts from zero forever —
+    which is precisely what `TargetAdapter.failure_ids` tells an implementer to
+    avoid.
+
+    And it is a disclosure: the fingerprint marker is appended to the issue body
+    AFTER the scrubber has run on it, so whatever the line carried is published
+    verbatim, and the same list is committed to the target's default branch in
+    `incident_memory/log.jsonl`.
+
+    Refusing is the correct answer rather than salvaging a leading word: a
+    generic `Error@path:line` shared by every unrelated prose failure is worse
+    than no identity, because it looks like one.
+    """
+
+    PROSE = (
+        "Error refreshing credential AKIAIOSFODNN7EXAMPLE for user bob@corp.example\n"
+        '  File "/srv/app/worker.py", line 42, in refresh\n'
+    )
+    REAL = (
+        "Traceback (most recent call last):\n"
+        '  File "/srv/app/worker.py", line 42, in refresh\n'
+        "AttributeError: 'State' object has no attribute 'comfyui'\n"
+    )
+
+    def test_a_prose_line_yields_no_fingerprint(self):
+        self.assertEqual(failure_fingerprints(self.PROSE), [])
+
+    def test_and_the_cycle_is_refused_rather_than_keyed_on_it(self):
+        # The log carries failure text, so this is the coverage-gap branch, not
+        # idle. `watch.yml` stops here before spending an agent call.
+        self.assertTrue(unfingerprintable(self.PROSE))
+
+    def test_nothing_from_that_line_can_reach_the_issue_marker(self):
+        # The marker is what actually ships. Asserted on the decoded payload
+        # rather than on the fingerprint list, because base64 is encoding, not
+        # protection, and the encoded form hides a plain-text search.
+        marker = fingerprint_marker(failure_fingerprints(self.PROSE))
+        decoded = " ".join(_marked_fingerprints(marker))
+        self.assertNotIn("AKIAIOSFODNN7EXAMPLE", decoded)
+        self.assertNotIn("bob@corp.example", decoded)
+
+    def test_a_real_exception_still_fingerprints(self):
+        # The guard must not buy safety by refusing the ordinary case.
+        self.assertEqual(
+            failure_fingerprints(self.REAL, strip_prefix="/srv/app"),
+            ["AttributeError@worker.py:42"],
+        )
+
+    def test_a_dotted_type_still_fingerprints(self):
+        # `com.acme.NotFoundException` is one identifier with dots, not prose.
+        java = (
+            "com.acme.NotFoundException: no account for user alice\n"
+            '  File "/srv/app/a.py", line 9, in find\n'
+        )
+        self.assertEqual(
+            failure_fingerprints(java, strip_prefix="/srv/app"),
+            ["com.acme.NotFoundException@a.py:9"],
+        )
+
+
+class AFingerprintIsNeverPutThroughTheScrubber(unittest.TestCase):
+    """Redacting an identity destroys the identity. This pins the refusal.
+
+    The reasoning is not obvious and the change is tempting — the fingerprint
+    marker is appended to an issue body after that body has been scrubbed, so
+    "just scrub the fingerprints too" reads like the safe fix. It is not.
+
+    A fingerprint is `Type@path:line`. On a path with no directory component,
+    which is the ordinary case for Go and Ruby, that is character-for-character
+    the shape of an email address, and the scrubber's PII rule rewrites
+    `panic@handler.go:42` to `[REDACTED]:42`. Every distinct Go failure then
+    collapses onto one identity: dedup matches unrelated bugs, incident memory
+    recalls the wrong prior fix, and the attempt cap counts them together —
+    silently, on exactly the runtimes the adapter seam exists to serve.
+
+    The built-in path is bounded by SHAPE instead (see the class above), and
+    what an adapter returns is bounded by the contract stated in
+    `adapters/base.py` and `reference/adapter.md`: that string is published in
+    an issue body and committed to the default branch, so it must not carry
+    log payload.
+    """
+
+    GO_ID = "panic@handler.go:42"
+
+    def test_the_scrubber_would_indeed_destroy_it(self):
+        # The premise, asserted rather than described — if this ever stops
+        # being true the reasoning above is stale and the refusal is arguable.
+        from guardrails.confidentiality_filter import scrub
+
+        self.assertEqual(scrub(self.GO_ID), "[REDACTED]:42")
+
+    def test_so_a_supplied_identity_passes_through_intact(self):
+        self.assertEqual(
+            failure_fingerprints("panic: boom\n", ids_fn=lambda raw: [self.GO_ID]),
+            [self.GO_ID],
+        )
+
+    def test_and_two_distinct_go_failures_stay_distinct(self):
+        # What redaction would cost, stated as behaviour: these two collapse to
+        # one identity the moment anything scrubs them.
+        both = failure_fingerprints(
+            "panic: boom\n",
+            ids_fn=lambda raw: ["panic@handler.go:42", "panic@billing.go:9"],
+        )
+        self.assertEqual(len(set(both)), 2, both)
 
 
 if __name__ == "__main__":

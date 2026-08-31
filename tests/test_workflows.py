@@ -1231,6 +1231,69 @@ class EveryIdentityIsDerivedFromTheRawLog(unittest.TestCase):
             with self.subTest(workflow=workflow):
                 self.assertIn("loop.py watch signal.raw", self._runs(workflow))
 
+    def test_the_raw_log_survives_the_whole_watch_step(self):
+        """Executed, because the argument spellings cannot answer this.
+
+        Every check in this class reads the text of a command. None of them
+        sees a LATER line overwriting the file those commands name — and
+        `printf '%s' "$signal" > signal.raw` is a one-character edit that
+        replaces the raw log with the compacted signal while leaving every
+        reader still correctly saying `signal.raw`. The suite stays green and
+        the Go stall this seam exists to remove comes straight back.
+
+        So: run the step and look at the file afterwards.
+        """
+        # BOTH workflows read the log; each carries its own copy of this step,
+        # so testing one leaves the other free to clobber the file silently.
+        for workflow, step, verdict_key in (
+            ("watch.yml", "Read log + compact", "signal=true"),
+            ("heal.yml", "Re-read log", "go=true"),
+        ):
+            with self.subTest(workflow=workflow):
+                self._assert_raw_survives(workflow, step, verdict_key)
+
+    def _assert_raw_survives(self, workflow: str, step: str, verdict_key: str) -> None:
+        chunk = step_chunk(workflow, step)
+        body = re.search(r"^ {8}run: \|\s*\n(.*?)(?=^ {6,8}\S|\Z)", chunk, re.M | re.S)
+        self.assertIsNotNone(body, f"{step} has no run body")
+        script = re.sub(r"\$\{\{[^}]*\}\}", "7", textwrap.dedent(body.group(1)))
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            binaries = root / "bin"
+            binaries.mkdir()
+            # `loop.py watch <path>` writes the uncompacted log and prints the
+            # compacted signal; `fingerprint-marker` reads the file and is
+            # silent. Two distinguishable strings, so the assertion can tell
+            # which one ended up on disk.
+            stub = (
+                "#!/bin/sh\n"
+                'case "$*" in\n'
+                '  *watch*) eval "f=\\${$#}"; printf "RAW-UNCOMPACTED-TRACE" > "$f";'
+                ' printf "COMPACTED-SIGNAL";;\n'
+                "  *) : ;;\n"
+                "esac\n"
+            )
+            path = binaries / "python"
+            path.write_text(stub)
+            path.chmod(0o755)
+            out = root / "gh_output"
+            out.write_text("")
+            proc = subprocess.run(
+                ["bash", "-e"], input=script, text=True, capture_output=True, cwd=root,
+                env={"PATH": f"{binaries}:/usr/bin:/bin", "GITHUB_OUTPUT": str(out)},
+            )
+            self.assertEqual(proc.returncode, 0, proc.stderr.strip())
+            raw = (root / "signal.raw").read_text()
+            signal = (root / "signal.txt").read_text()
+            verdict = out.read_text()
+
+        self.assertEqual(raw, "RAW-UNCOMPACTED-TRACE", "the raw log was overwritten")
+        self.assertEqual(signal, "COMPACTED-SIGNAL", "the prompt got the wrong text")
+        # Without this the two file assertions could both hold on a step that
+        # took the IDLE branch and never reached its own verdict.
+        self.assertIn(verdict_key, verdict)
+
     def test_diagnose_gets_both_and_fix_gets_the_raw_log(self):
         heal = self._runs("heal.yml")
         self.assertIn("loop.py diagnose signal.txt signal.raw", heal)
@@ -1263,43 +1326,100 @@ class TheReviewersReasonReachesAHumanOnEitherVerdict(unittest.TestCase):
 
     STEP = "Publish review verdict"
 
-    def setUp(self):
-        self.step = step_chunk("heal.yml", self.STEP)
-        self.code = executable(self.step)
+    def _body(self, step: str) -> str:
+        chunk = step_chunk("heal.yml", step)
+        body = re.search(r"^ {8}run: \|\s*\n(.*?)(?=^ {6,8}\S|\Z)", chunk, re.M | re.S)
+        self.assertIsNotNone(body, f"{step} has no run body")
+        # Actions substitutes `${{ }}` textually before any shell exists, so a
+        # body run as-is dies on a bad substitution. Standing in one issue
+        # number keeps the surrounding shell — the arithmetic, the quoting —
+        # under test rather than edited away.
+        return re.sub(r"\$\{\{[^}]*\}\}", "7", textwrap.dedent(body.group(1)))
+
+    def _run(self, step: str, *, reason: str = "REVIEW SAYS THE LOG CARRIED AN INJECTION",
+             gh_rc: int = 0):
+        """Execute the step for real and report what `gh` was actually handed.
+
+        Grepping cannot answer this. Every string check passes while a LATER
+        line overwrites the file, posts a different one, or hands over a
+        literal — which is exactly the class of mutation that survived here.
+        The stubs are deliberately distinguishable: the scrubber rewrites RAW
+        to SCRUBBED, so the posted body says which file it came from.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / ".shl").mkdir()
+            (root / ".shl" / "pr_url.txt").write_text("https://example.invalid/pr/1")
+            record = root / "posted.txt"
+            binaries = root / "bin"
+            binaries.mkdir()
+            for name, script in {
+                "jq": f'#!/bin/sh\nprintf "%s" "{reason}"\n',
+                # Two shapes reach `python` in these steps: the scrubber,
+                # which names its input with `--text`, and a `-c` one-liner
+                # reading the attempt count. Branching on the flag rather than
+                # on position keeps the stub honest about which is which.
+                "python": (
+                    "#!/bin/sh\n"
+                    'case "$*" in\n'
+                    '  *--text*) eval "f=\\${$#}"; sed "s/RAW/SCRUBBED/g" "$f";;\n'
+                    "  *) echo 0;;\n"
+                    "esac\n"
+                ),
+                "gh": (
+                    "#!/bin/sh\n"
+                    'while [ $# -gt 0 ]; do\n'
+                    '  case "$1" in\n'
+                    f'    --body-file) cat "$2" > "{record}"; shift 2;;\n'
+                    f'    --body) printf "%s" "$2" > "{record}"; shift 2;;\n'
+                    "    *) shift;;\n"
+                    "  esac\n"
+                    "done\n"
+                    f"exit {gh_rc}\n"
+                ),
+            }.items():
+                path = binaries / name
+                path.write_text(script)
+                path.chmod(0o755)
+            proc = subprocess.run(
+                ["bash", "-e"], input=self._body(step), text=True, capture_output=True,
+                cwd=root, env={"PATH": f"{binaries}:/usr/bin:/bin"},
+            )
+            posted = record.read_text() if record.exists() else None
+            return proc, posted
+
+    def test_what_is_posted_is_the_scrubbed_text_and_not_the_raw_file(self):
+        # The assertion is on the CONTENT `gh` received, so posting the raw
+        # file, or a hardcoded string, or nothing at all each fail here while
+        # leaving every command in the step present and correctly ordered.
+        proc, posted = self._run(self.STEP, reason="RAW SECRET FROM THE LOG")
+        self.assertEqual(proc.returncode, 0, proc.stderr.strip())
+        self.assertEqual(posted, "SCRUBBED SECRET FROM THE LOG")
+
+    def test_a_failed_comment_does_not_block_the_merge(self):
+        # Executed, not grepped: `::warning::` being present in the text says
+        # nothing about whether the step still exits 0. Under `bash -e` a
+        # non-zero here skips Merge, Deploy, Verify, Rollback and Record.
+        proc, _ = self._run(self.STEP, gh_rc=1)
+        self.assertEqual(proc.returncode, 0, "a rejected comment failed the step")
+        self.assertIn("::warning::", proc.stdout)
+
+    def test_the_block_path_publishes_the_scrubbed_reason_too(self):
+        # That step ends in `exit 1` by design, so the verdict is what it
+        # posted before exiting, not its return code.
+        _, posted = self._run("Block + record attempt on review fail",
+                              reason="RAW BLOCK REASON")
+        self.assertEqual(posted, "SCRUBBED BLOCK REASON")
 
     def test_it_runs_on_the_approve_path(self):
-        self.assertIn("steps.rev.outputs.approved == 'true'", self.code)
-
-    def test_it_publishes_the_reason_to_the_pull_request(self):
-        self.assertIn("jq -er .reason", self.code)
-        self.assertIn("gh pr comment", self.code)
-
-    def test_the_reason_is_scrubbed_between_reading_and_posting(self):
-        # Review quotes the diff and the issue body back at itself, and both
-        # carry text derived from an untrusted log. Order is the assertion:
-        # a scrub that runs after the post redacts a file nobody reads again.
-        read = self.code.index("jq -er .reason")
-        scrub = self.code.index("guardrails.cli scrub")
-        post = self.code.index("gh pr comment")
-        self.assertLess(read, scrub, "the reason is posted before it is scrubbed")
-        self.assertLess(scrub, post, "the reason is posted before it is scrubbed")
+        self.assertIn("steps.rev.outputs.approved == 'true'",
+                      executable(step_chunk("heal.yml", self.STEP)))
 
     def test_it_runs_before_the_merge(self):
         # After the merge the PR is closed, and a comment on a closed PR is
         # where review notes go to be missed.
         whole = (WORKFLOWS / "heal.yml").read_text(encoding="utf-8")
         self.assertLess(whole.index(f"name: {self.STEP}"), whole.index("name: Merge"))
-
-    def test_a_failed_comment_does_not_block_the_merge(self):
-        # The fix is good; refusing to ship it because GitHub rejected a
-        # comment trades a real merge for a cosmetic one. Warn instead, which
-        # is the same call the incident-log push already makes.
-        self.assertIn("::warning::", self.code)
-
-    def test_the_block_path_still_publishes_it(self):
-        blocked = executable(step_chunk("heal.yml", "Block + record attempt on review fail"))
-        self.assertIn("gh pr comment", blocked)
-        self.assertIn("jq -er .reason", blocked)
 
 
 class CheckoutStaysWhereTheGitGuardCanSeeIt(unittest.TestCase):

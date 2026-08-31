@@ -71,6 +71,17 @@ class TargetAdapter(ABC):
         - **Owned.** Prefer a frame in this project's own code over one in a
           dependency, for the same reason.
 
+        **What you return is published.** It goes into the dedup marker on a
+        GitHub issue, and into the incident log this loop commits to the
+        default branch. It is deliberately NOT passed through the
+        confidentiality scrubber: an identity of the shape ``panic@handler.go:42``
+        is character-for-character an email address, so redaction would rewrite
+        it and collapse every distinct failure onto one key. So the bound is
+        yours — key on the type and the frame, never on the message payload.
+        That is the same rule as **Stable** above, arrived at from the other
+        side: a value that varies between two occurrences of one bug is also a
+        value that carries whatever the log put there.
+
         Return None to use the built-in parsing, which is correct on a Python or
         JS target. Return ``[]`` only when the log genuinely holds no failure.
         """

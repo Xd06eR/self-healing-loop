@@ -30,7 +30,21 @@ _ERROR_RE = re.compile(
 # level into an identity: every unrelated failure sharing a frame collapses to
 # one fingerprint, which is the same defect as keying on a message. An
 # exception TYPE is CamelCase in every language this parses; a log level is not.
-_EXC_LINE_RE = re.compile(r"^(?:[A-Za-z_][\w.]*)?(?:Error|Exception)\b")
+_EXC_LINE_RE = re.compile(r"^(?:[A-Za-z_][\w.]*)?(?:Error|Exception)\w*\b")
+# What may stand as the TYPE half of a fingerprint: one identifier, dots
+# allowed for a package-qualified name (`AttributeError`,
+# `com.acme.NotFoundException`). The rule above matches any line STARTING with
+# the word Error or Exception, which includes ordinary prose an application
+# logs — and everything before that line's first colon is then the whole line.
+# Two defects in one. It is an unstable identity, because the payload differs
+# between two occurrences of the same failure, so dedup misses and the attempt
+# cap counts from zero forever. And it is a disclosure, because the fingerprint
+# marker is appended to the issue body AFTER the scrubber has run and the same
+# list is committed to the default branch in the incident log.
+# A line failing this test yields NO fingerprint rather than a salvaged leading
+# word: a generic `Error@path:line` shared by every unrelated prose failure is
+# worse than no identity, because it looks like one.
+_EXC_TYPE_RE = re.compile(r"^[A-Za-z_][\w.]*$")
 _TB_START_RE = re.compile(r"^Traceback \(most recent call last\)")
 # Python's two chain markers. The exception line ABOVE one of these is not the
 # failure — it is an intermediate step on the way to it, and it is routinely
@@ -152,7 +166,13 @@ def _exception_signature(block: list[str]) -> str | None:
     for line in reversed(block):
         stripped = line.strip()
         if _EXC_LINE_RE.match(stripped):
-            return f"{stripped.split(':', 1)[0]}@{frame}"
+            kind = stripped.split(":", 1)[0]
+            # Keep scanning rather than giving up: a block whose LAST matching
+            # line is prose may still carry a real `Type: message` above it,
+            # and that is the line the walk backwards exists to find.
+            if not _EXC_TYPE_RE.match(kind):
+                continue
+            return f"{kind}@{frame}"
     return None
 
 
@@ -235,6 +255,17 @@ def failure_fingerprints(raw: str, strip_prefix: str = "", ids_fn=None) -> list[
     if ids_fn is not None:
         supplied = ids_fn(raw)
         if supplied is not None:
+            # NOT scrubbed, and that is deliberate rather than an omission.
+            # A fingerprint is `Type@path:line`, which on a path with no
+            # directory component — `panic@handler.go:42` — is exactly the
+            # shape of an email address, so the scrubber's PII rule rewrites it
+            # to `[REDACTED]:42`. Redacting here would silently destroy the
+            # identity on precisely the Go and Ruby targets this seam exists to
+            # serve, and an identity that differs between the write side and
+            # the lookup side is this module's worst failure. The control is
+            # the CONTRACT instead: `adapters/base.py` and `reference/adapter.md`
+            # tell the implementer this string is published in an issue body
+            # and committed to the default branch.
             return list(dict.fromkeys(s.replace(prefix, "") if prefix else s for s in supplied))
     seen: set[str] = set()
     fingerprints: list[str] = []
