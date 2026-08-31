@@ -27,10 +27,9 @@ If any of that is unacceptable, do not run this. The loop still works; you simpl
   ```
 - [ ] **Dispatch the watch on that branch**, or use *Actions → shl-watch → Run workflow* and select it.
 
-    ```bash
-    gh workflow run watch.yml --ref self-healing-loop-install
-    ```
-
+  ```bash
+  gh workflow run watch.yml --ref self-healing-loop-install
+  ```
 - [ ] **Confirm the whole chain**, not just the ending: issue filed · reproducing test written and proven RED · fix applied · gate green · PR opened · review passed · merge · deploy if configured · verify · incident recorded.
 - [ ] **Read the evidence bundle** from the run's artifacts. It carries each role's exact prompt and raw output, which is the only way to see *why* the agent did what it did.
 

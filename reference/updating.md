@@ -145,7 +145,6 @@ Left column only: names something reads that nothing sets. It writes no file, de
 
 **What it prints is a candidate list, not a work list, and most of it is optional.** The command reads every `SHL_*` the workflows mention, and the majority are guarded so that unset is the intended state: `SHL_SETUP_CMD`, `SHL_DEPLOY_CMD` and `SHL_EVIDENCE_UPLOAD` each sit behind an `if:` comparing against the empty string, the gate's glob and pattern variables are appended only when non-empty, `SHL_ADAPTER` falls back to `adapters.target`, and `SHL_BASE_URL` and `SHL_AUTH_ENV` are empty on a harness's native provider. So resolve the output against `SETUP.md`'s own `gh variable set` block, the record of what **this** install decided to set, and report the remainder as optional and deliberately unset rather than as work. Handing the raw list over as commands is worse than reporting nothing: `gh` prompts on an empty `--body` and the prompt consumes the next line of the paste, so a list of mostly-spurious lines is also a list that mis-sets whatever follows it.
 
-
 ## What the operator is told
 
 An update that lands changes without naming them is asking for blind consent. Three sections, and the second is the one that needs their attention:
