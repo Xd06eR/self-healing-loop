@@ -1,6 +1,6 @@
 ---
 name: self-healing-loop
-description: Install the self-healing loop into the current project, as a guided consultation. Determines what the repo can answer, interviews the operator about everything else, records every decision with its provenance, then vendors the core, generates the target adapter and the two GitHub Actions workflows, and guides the SHL_* env/secret setup. Use when the user asks to set up or install the self-healing loop, wire autonomous bug-fixing, or add self-healing CI/CD to a repo.
+description: Install the self-healing loop into the current project, returning an unmerged install PR. Use when asked to install the self-healing loop, wire autonomous bug-fixing, or add self-healing CI/CD to a repo. Not for an unattended install, for work on this framework, or for the loop's own roles.
 ---
 
 # Self-healing loop — installer
