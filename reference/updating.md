@@ -162,7 +162,7 @@ All of it, and none of it changes behaviour:
 
 - [ ] The manifest check from the install phase passes: no extra file, none missing.
 - [ ] The vendored core imports clean:
-      `cd .shl && PYTHONPATH=. python3 -B -c "import loop, role, evidence, log_compact, gh_state; from guardrails import cli, gate, incident_memory; from adapters.base import TargetAdapter; print('ok')"`
+    `cd .shl && PYTHONPATH=. python3 -B -c "import loop, role, evidence, log_compact, gh_state; from guardrails import cli, gate, incident_memory; from adapters.base import TargetAdapter; print('ok')"`
 - [ ] The **target's own** adapter tests still pass. The core moved under them, and `adapters/target.py` did not.
 - [ ] `actionlint` is clean on both workflows.
 - [ ] The `schedule` block reads exactly what it read before, and `grep` finds no reference to an old loop directory name.
