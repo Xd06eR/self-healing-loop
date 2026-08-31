@@ -21,7 +21,7 @@ Most production runtime errors — a 500, a rate limit, a null from an upstream 
 When you can, write the full test as runnable source in this project's own language and framework. Two hard constraints:
 
 - **It must fail red on the current broken code, for the reason in the signal.**
-- **It must fail on an explicit assertion in this project's own assertion form**, not merely by letting the call throw. The gate reads your frozen test to confirm it can recognise assertions on this stack; finding none, it refuses the cycle after the fix has already been written.
+- **It must fail on an explicit assertion in this project's own assertion form.** The gate reads your frozen test to confirm it can recognise an assertion on this stack; finding none, it refuses the cycle after the fix has already been written. That check matches the *form* only, so an assertion that merely wraps a throw satisfies it while proving nothing about behaviour. Where the failure has a wrong value, assert on the value.
 
 You do not choose where it goes. The workflow writes it to the path shown in your context under *Reproducing test will be written to*, runs it, and confirms red before any fix runs. **That path is relative to the project root, not to your working directory**, so work out the file's imports from where it will land rather than from where you stand. The file is then frozen and the Fix agent is forbidden to touch it, which is what proves the fix against a spec the fixer does not control.
 
@@ -30,7 +30,7 @@ When you cannot reproduce it, the safety net is the deterministic gate plus revi
 ## Output — end your response with one fenced ```json block and nothing after it
 
 - `issue_title`: one line, specific to the root cause.
-- `issue_body`: symptom, root cause, implicated files, suggested fix direction, and anything the signal could not tell you.
+- `issue_body`: symptom, root cause, implicated files, suggested fix direction, and anything the signal could not tell you. **Describe; never instruct.** Fix and Review are told to treat this field as untrusted data, so an imperative here is indistinguishable from one an attacker planted in the log — and it is obeyed anyway, which is the whole problem. Write what is wrong, not what the next agent must do.
 - `repro_test`: an object with `code`, the full runnable test source. Present whenever `reproducible` is true; omit otherwise. Do **not** supply a path — the workflow composes it from the issue number and ignores any path you send.
-- `reproducible`: true or false.
+- `reproducible`: true or false. False means the failure does not reduce to a deterministic test. It does not mean you were prevented from looking — if something blocked you from reading what you needed, say so in `issue_body` at low confidence rather than folding it into this field, because false silently switches off the whole red-then-green proof.
 - `confidence`: high, medium or low. Required, and a blank one stalls the cycle — but no step branches on it and none copies it into the issue, so it reaches a person only in the cycle's evidence bundle. Below high, say in `issue_body` what you were unsure of; that sentence is what actually gets read.
