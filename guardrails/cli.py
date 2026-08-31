@@ -133,8 +133,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.cmd == "gate":
-        # Half a baseline pair silently disables BOTH the regression check and
-        # the fix proof, so refuse it rather than passing a hollow gate.
+        # Half a baseline pair silently disables the regression check and the
+        # --suite-rc cross-check, so refuse it rather than passing a hollow
+        # gate. The fix proof is --repro-rc and is guarded separately below.
         if bool(args.baseline) != bool(args.current):
             sys.stderr.write("--baseline and --current must be supplied together\n")
             return 2
@@ -154,9 +155,6 @@ def main(argv: list[str] | None = None) -> int:
         # must not silently switch off the built-in `test_*` / `*.test.*` rules.
         test_globs = tuple(_DEFAULT_TEST_GLOBS) + _split(args.test_globs)
         config_globs = tuple(_DEFAULT_TEST_CONFIG_GLOBS) + _split(args.test_config_globs)
-        # Same reasoning for the patterns: alternate the target's form with the
-        # built-in rather than replacing it, so supplying a Go rule cannot turn
-        # off recognition of the Python and JS forms a mixed repo still uses.
         try:
             assert_re = _alternate(_ASSERT_RE, args.assert_pattern)
             skip_re = _alternate(_SKIP_RE, args.skip_pattern)
@@ -215,37 +213,22 @@ def main(argv: list[str] | None = None) -> int:
         # cause; and the pass line below is built from this same list, so it
         # cannot claim a check that is not in it. A hardcoded attestation states
         # what the code was written to do rather than what it did, which turns a
-        # deleted check into a signed approval naming the guarantee that was
-        # removed — worse than the empty file this replaced.
+        # deleted check into a signed approval naming the guarantee it dropped.
         checks = [
-            # First, and it must stay first. Fix runs with cwd `.shl/`, and an
-            # edit-permitting mode auto-approves writes there — the directory
-            # holding this CLI, the gate it calls, the scrubber and loop.py — so
-            # a fix that rewrote the gate would otherwise be judged BY the
-            # rewritten gate. Every other check polices the agent's OUTPUT; this
-            # one polices its REACH. Every entry is evaluated when this list is
-            # built, so position decides which reason is REPORTED, not whether a
-            # check runs — stated without a count, which went stale the first
-            # time an entry was added. The workflow's `git`-only step is what covers the case
-            # where this module is itself the thing that was tampered with.
+            # Every entry is evaluated when this list is built, so position
+            # decides which reason is REPORTED, not whether a check runs. The
+            # first four police the agent's REACH and the rest its OUTPUT, so
+            # a blocked cycle names the reach violation. The workflow's
+            # `git`-only step is what covers the case where this module is
+            # itself the thing that was tampered with.
             ("loop tree untouched", is_loop_tree_touched(diff)),
-            # Second for the same reason the first is first: the loop tree holds
-            # the judge, this holds the step that calls it. A diff deleting the
-            # Gate step passes every OUTPUT check, because there is no output
-            # left to police.
             ("workflow untouched", is_workflow_touched(diff)),
-            # Third of the same family, and it must precede every content-based
-            # check below: `.gitattributes` decides whether those checks get any
-            # content to read at all. A fix that adds `* -diff` leaves the loop
-            # tree and the workflow untouched and still blinds the gate.
+            # Must precede every content-based check below: `.gitattributes`
+            # decides whether those checks get any content to read at all.
             ("diff rendering untouched", is_diff_config_touched(diff)),
-            # Fourth of the family, and the one that does not depend on the
-            # agent having touched a tracked file. The check above stops a
-            # `.gitattributes` being committed; this stops the same blinding
-            # arriving by a route that leaves no diff at all — `.git/info/
-            # attributes`, `core.attributesFile`, or a single NUL byte, which
-            # needs no configuration anywhere. It asks the one question they
-            # share: is there a test file here whose content git did not print?
+            # The one that does not depend on the agent having touched a tracked
+            # file: a NUL byte or an attributes file outside the tree blinds the
+            # content checks while leaving no diff at all.
             ("test content readable", is_test_content_unreadable(diff, test_globs=test_globs)),
             ("no test weakened", is_test_weakened(
                 diff, test_globs=test_globs, assert_re=assert_re, skip_re=skip_re
@@ -260,11 +243,9 @@ def main(argv: list[str] | None = None) -> int:
                 ("frozen test untouched", is_frozen_test_touched(diff, args.frozen))
             )
         if helper_freeze:
-            # Freezing the file does not freeze what it imports: neuter a helper
-            # beside it and the frozen test goes green with the bug intact.
-            # Applies only where the directory is a dedicated test tree, because
-            # a layout that puts tests beside source would refuse every
-            # legitimate fix. The pass line below says which way it went.
+            # Conditional because a layout that puts tests beside source would
+            # refuse every legitimate fix. The pass line below says which way
+            # it went.
             checks.append(
                 ("frozen test's helpers untouched", is_test_helper_touched(
                     diff, args.frozen, test_globs=test_globs
@@ -304,8 +285,7 @@ def main(argv: list[str] | None = None) -> int:
         # The fix is PROVEN only by the frozen reproducing test going green, and
         # only its own exit code proves that: absence from a failure list is
         # also what a test that errored at collection, or was deselected, looks
-        # like. Required above, so there is one proof here rather than a
-        # preferred one and a weaker fallback that could disagree with it.
+        # like.
         if args.frozen and args.repro_rc != 0:
             sys.stderr.write(
                 f"frozen reproducing test did not pass (exit {args.repro_rc}): {args.frozen}\n"
@@ -327,8 +307,7 @@ def main(argv: list[str] | None = None) -> int:
         attested.append(f"{count_test_files(diff, test_globs)} test file(s) matched the test globs")
         if args.frozen and not helper_freeze:
             # Named, not omitted. A check that quietly did not apply reads
-            # exactly like one that ran and passed — which is how the hole this
-            # closes went unnoticed in the first place.
+            # exactly like one that ran and passed.
             attested.append(
                 "helpers beside the frozen test NOT frozen — its directory is "
                 "not a dedicated test tree, so a fix may edit what it imports"
@@ -338,7 +317,7 @@ def main(argv: list[str] | None = None) -> int:
             # supplied and unreadable. The proof hangs off `--frozen`, and the
             # workflow passes that only when Diagnose could reproduce — which
             # the prompts describe as the minority case. So on most cycles the
-            # proof never ran, and saying nothing let a pass read as though the
+            # proof never runs, and silence would let a pass read as though the
             # pattern had been checked against something.
             attested.append(
                 "assertion pattern NOT proved against the frozen test"

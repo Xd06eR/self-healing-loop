@@ -16,10 +16,6 @@ Failures propagate (JSONDecodeError, nonzero gh) and the step dies, because
 Actions runs each ``run:`` body under ``bash -e``. That is the intended
 direction: a cycle that cannot read its own attempt count must not proceed as
 though the count were zero, which would let one failure be re-attempted forever.
-
-State lives in GitHub rather than on the runner because the runner is
-disposable — a file-backed counter resets to zero on every cycle, so the attempt
-cap it exists to enforce could never be reached.
 """
 import base64
 import json
@@ -76,7 +72,7 @@ def _marked_fingerprints(body: str) -> set:
 
     The workflow appends its marker after the scrubbed issue body, so the
     workflow's is always the final one. The body itself is agent-written from
-    untrusted logs, and a first-match search let a decoy marker in the prose
+    untrusted logs, and a first-match search lets a decoy marker in the prose
     hijack dedup: the wrong fingerprints match nothing, the loop files a
     duplicate issue, and the attempt cap on the real one counts from zero.
     """
@@ -88,9 +84,9 @@ def _marked_fingerprints(body: str) -> set:
         padded = token + "=" * (-len(token) % 4)
         return set(json.loads(base64.urlsafe_b64decode(padded)))
     except (ValueError, json.JSONDecodeError):
-        # The comma-joined form, from issues filed before the encoding. A
-        # target updating mid-flight still needs to recognise them or it
-        # re-files a duplicate for every failure it has already healed.
+        # The comma-joined form, which issues filed by an older install still
+        # carry. A target that stops recognising them re-files a duplicate for
+        # every failure it has already healed.
         return set(filter(None, token.split(",")))
 
 

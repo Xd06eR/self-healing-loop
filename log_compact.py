@@ -46,11 +46,8 @@ _EXC_LINE_RE = re.compile(r"^(?:[A-Za-z_][\w.]*)?(?:Error|Exception)\w*\b")
 # worse than no identity, because it looks like one.
 _EXC_TYPE_RE = re.compile(r"^[A-Za-z_][\w.]*$")
 _TB_START_RE = re.compile(r"^Traceback \(most recent call last\)")
-# Python's two chain markers. The exception line ABOVE one of these is not the
-# failure — it is an intermediate step on the way to it, and it is routinely
-# pure library code (starlette turns a KeyError into the AttributeError the app
-# actually sees). Splitting there gives that fragment its own identity, which
-# every unrelated bug reaching the same library line then shares.
+# Python's two chain markers. The exception line ABOVE one of these is an
+# intermediate step on the way to the failure, not the failure.
 _TB_CHAIN_RE = re.compile(
     r"^(?:During handling of the above exception"
     r"|The above exception was the direct cause)"
@@ -64,13 +61,8 @@ _FRAME_RE = re.compile(r'^\s*File "([^"]+)", line (\d+)')
 # across builds, and two occurrences of one bug must fingerprint identically.
 _JS_FRAME_RE = re.compile(r"^\s*at (?:[^()]*\()?([^()\s]+?):(\d+):\d+\)?\s*$")
 
-# Third-party code. The DEEPEST frame of a traceback is usually here — the
-# library that finally raised — and it is shared by every unrelated bug that
-# reaches it: two different missing attributes both bottom out at the same line
-# of starlette's datastructures.py. Keying on that makes distinct failures
-# identical, which collapses them into one compaction slot (dropping the rarer
-# one) and makes incident memory recall the wrong prior fix. The deepest frame
-# in code the project OWNS is what actually identifies the bug.
+# Third-party code, which is where the deepest frame of a traceback usually
+# sits. The identifying frame is the deepest one the PROJECT owns.
 _VENDOR_RE = re.compile(
     r"(?:^|/)(?:\.venv|venv|site-packages|dist-packages|node_modules|vendor|\.tox|\.nox)(?:/|$)"
     r"|^/usr/lib/python"
@@ -99,7 +91,6 @@ _PAYLOAD = (
 
 
 def _is_continuation(line: str) -> bool:
-    # Traceback frames and indented context start with whitespace.
     return bool(line) and line[0].isspace()
 
 
@@ -189,11 +180,9 @@ def _signature(block: list[str]) -> str:
 
 # CPython renders `asyncio.TaskGroup` tracebacks (3.11+) with a `|`/`+` gutter
 # down the left of every frame: `  |   File "x", line 1`. The gutter sits where
-# the frame regex expects whitespace, so every ExceptionGroup failure
-# fingerprinted to nothing and the whole async-by-TaskGroup class was refused
-# as unfingerprintable on any 3.11+ target. The strip is gated on the marker
-# CPython itself emits, so an ordinary log line that happens to begin with a
-# pipe is untouched.
+# the frame regex expects whitespace, so without this strip every ExceptionGroup
+# failure fingerprints to nothing. Gated on the marker CPython itself emits, so
+# an ordinary log line that happens to begin with a pipe is untouched.
 _GROUP_GUTTER = re.compile(r"^(\s*)[|+]")
 
 
@@ -213,7 +202,6 @@ def _keep_error_lines(raw: str) -> list[str]:
             in_tb = True
         elif in_tb and _is_continuation(line):
             kept.append(line)
-            # stays in the block until a non-indented non-error line breaks it
         else:
             in_tb = False
     return kept
@@ -255,17 +243,12 @@ def failure_fingerprints(raw: str, strip_prefix: str = "", ids_fn=None) -> list[
     if ids_fn is not None:
         supplied = ids_fn(raw)
         if supplied is not None:
-            # NOT scrubbed, and that is deliberate rather than an omission.
-            # A fingerprint is `Type@path:line`, which on a path with no
-            # directory component — `panic@handler.go:42` — is exactly the
-            # shape of an email address, so the scrubber's PII rule rewrites it
-            # to `[REDACTED]:42`. Redacting here would silently destroy the
-            # identity on precisely the Go and Ruby targets this seam exists to
-            # serve, and an identity that differs between the write side and
-            # the lookup side is this module's worst failure. The control is
-            # the CONTRACT instead: `adapters/base.py` and `reference/adapter.md`
-            # tell the implementer this string is published in an issue body
-            # and committed to the default branch.
+            # NOT scrubbed. A fingerprint is `Type@path:line`, which on a path
+            # with no directory component — `panic@handler.go:42` — is exactly
+            # the shape of an email address, so the scrubber's PII rule rewrites
+            # it to `[REDACTED]:42` and collapses every Go and Ruby failure onto
+            # one key. What bounds this string is the contract in
+            # `adapters/base.py`, which tells the implementer it is published.
             return list(dict.fromkeys(s.replace(prefix, "") if prefix else s for s in supplied))
     seen: set[str] = set()
     fingerprints: list[str] = []
@@ -336,23 +319,19 @@ def compact_log(raw: str, max_chars: int = 8000) -> str:
         return ""
     kept = _keep_error_lines(raw)
 
-    # One slot per DISTINCT failure, keeping its most recent occurrence and the
-    # number of times it happened. Without this, a health check that 500s on
-    # every page render buries a rarer bug under dozens of identical tracebacks,
-    # and the tail cut below drops the rare one entirely — so the loop can never
-    # see it and never heals it.
-    # Keyed by signature and ordered by LAST occurrence: re-inserting on every
-    # repeat moves a failure to the end of the dict. First-appearance order
-    # would make the eviction below drop whichever failure started earliest,
-    # including one still firing at the end of the window, which is the inverse
-    # of what "errors surface at the end of a log" is supposed to mean.
+    # One slot per DISTINCT failure, keyed by signature and ordered by LAST
+    # occurrence: re-inserting on every repeat moves a failure to the end of the
+    # dict. First-appearance order would make the eviction below drop whichever
+    # failure started earliest, including one still firing at the end of the
+    # window, which is the inverse of what "errors surface at the end of a log"
+    # is supposed to mean.
     latest: dict[str, list[str]] = {}
     counts: dict[str, int] = {}
     for block in _blocks(kept):
         sig = _signature(block)
         counts[sig] = counts.get(sig, 0) + 1
         latest.pop(sig, None)
-        latest[sig] = block  # most recent wins: it carries the freshest context
+        latest[sig] = block
 
     collapsed: list[list[str]] = []
     for sig, newest in latest.items():
@@ -362,11 +341,7 @@ def compact_log(raw: str, max_chars: int = 8000) -> str:
         collapsed.append(block)
 
     # Tail-biased: drop the failure that has been quiet longest, which is now
-    # the front of the list.
-    # Whole blocks, never part of one — slicing mid-traceback orphans the frames
-    # from their exception line, which hands the model a headless stack AND
-    # costs the failure its raise site, so it can only be identified by its
-    # message and collides with every other failure phrased the same way.
+    # the front of the list. Whole blocks, never part of one.
     while len(collapsed) > 1 and sum(len("\n".join(b)) + 1 for b in collapsed) > max_chars:
         collapsed.pop(0)
 

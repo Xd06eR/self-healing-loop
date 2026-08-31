@@ -44,9 +44,7 @@ from role import run_role
 
 
 # The loop appends one incident per healed cycle and runs on a cron for months,
-# so what reaches the prompt has to stay bounded. Exact-fingerprint matching
-# already keeps unrelated incidents out entirely; these cap the pathological
-# case where the SAME failure recurs dozens of times.
+# so what reaches the prompt has to stay bounded.
 MAX_RECALLED_INCIDENTS = 3
 MAX_ROOT_CAUSE_CHARS = 400
 
@@ -107,8 +105,6 @@ def recall_incidents(raw: str, repo_root: str = "", log_path: Path = DEFAULT_LOG
     keyed on less than the record was written with matches nothing while
     reporting success.
 
-    Keyed on failure fingerprints, never on the issue title: the title is prose
-    a model writes fresh each cycle, so it differs even for an identical repeat.
     The identities come from the same source `record_cycle` writes with, so the
     two halves of memory cannot key a failure differently. Empty string when
     nothing matches, which is the common case and the correct one.
@@ -133,22 +129,13 @@ def build_agent_from_env(
 def run_watch(adapter, raw_out: Path | None = None) -> str:
     """Read the target's log, return compacted signal. Empty string = idle.
 
-    ``raw_out`` receives the log exactly as read. Everything that derives a
-    failure IDENTITY reads that file rather than the signal, and the split is
-    load-bearing: compaction keeps error lines plus their INDENTED
-    continuation, while a Go panic puts its trace behind a blank line — which
-    ends the block, so the frames after it are dropped however they are
-    indented. Identifying from compacted text therefore hands
-    ``TargetAdapter.failure_ids`` a message with no frames, on precisely the
-    runtimes that method exists to serve — it returns ``[]``, the cycle is
-    refused as unfingerprintable, and the loop stalls on every tick forever.
+    ``raw_out`` receives the log exactly as read, and everything that derives a
+    failure IDENTITY reads that file rather than the return value: compaction
+    drops the frames an identity is built from.
 
     One ``read_log`` call serves both, because on most targets it is a network
-    request against the host's log API.
-
-    The prompt budget belongs to ``compact_log``; restating its default here
-    gave two places one number, and changing the real one would have left this
-    on the old value.
+    request against the host's log API. The prompt budget belongs to
+    ``compact_log``.
     """
     raw = adapter.read_log()
     if raw_out is not None:
@@ -173,13 +160,6 @@ def _agent_cwd(repo_path) -> Path:
 # path, but it must still write correct relative imports, which depend on the
 # directory — so it is told the pattern. `{}` matches SHL_TEST_ONE's placeholder
 # convention; the issue number does not exist yet at Diagnose time.
-#
-# There is deliberately NO default. A pytest-shaped default
-# (`tests/test_repro_issue_{}.py`) is on every other stack a wrong answer
-# indistinguishable from a working one: Diagnose gets told to write a `.py` path
-# (a strong steer to emit the wrong language outright) and the file lands where
-# the runner never collects, so the red-then-green proof silently never runs.
-# Phase 1 discovers this per target; unset means the install is incomplete.
 def _repro_path_pattern() -> str:
     pattern = os.environ.get("SHL_REPRO_PATH")
     if not pattern:
@@ -280,14 +260,12 @@ def frozen_repro(diagnose: dict) -> str:
     `true`. Anything downstream that decides the same question differently is
     describing a cycle that did not happen.
 
-    Reading `repro_test.code` was such a difference. `role.validate_contract`
+    Deciding on `repro_test.code` is such a difference. `role.validate_contract`
     constrains only the forward direction — `reproducible: true` requires a
     usable `repro_test` — so a payload carrying `reproducible: false` beside
-    populated code is valid, and on it the workflow froze nothing while Fix was
+    populated code is valid, and on it the workflow freezes nothing while Fix is
     handed a FROZEN path over a template promising that file was already proven
-    red. Both call sites in `main()` spelled the derivation out separately,
-    which is what let it be wrong in one place; it is resolved here instead, the
-    same way `failure_ids` is.
+    red.
 
     `is not True` rather than a truthiness test: `"false"` is a non-empty string
     and this must not be the one place a quoted flag gets through.
@@ -392,12 +370,8 @@ def main(argv: list[str] | None = None) -> int:
     if cmd in ("fingerprint-marker", "find-issue"):
         signal = Path(args[1]).read_text(encoding="utf-8")
         ids_fn = optional_ids_fn()
-        # Refuse a failure whose stack this compactor cannot read, rather than
-        # proceeding with no dedup key. Without one the workflow finds no
-        # existing issue, opens a new one, and counts zero prior attempts, so
-        # the same failure is healed again on every tick and the cap that exists
-        # to stop that never accumulates. Stopping here costs one cycle and says
-        # why; continuing costs every cycle and says nothing.
+        # Stopping here costs one cycle and says why; continuing with no dedup
+        # key costs every cycle and says nothing.
         if unfingerprintable(signal, ids_fn=ids_fn):
             sys.stderr.write(
                 "this log carries a failure but no fingerprint could be derived "

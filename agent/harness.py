@@ -1,25 +1,19 @@
 """How the loop talks to a coding agent — config-as-data, universal across harnesses.
 
-Every headless CLI agent shares three primitives: an argv list, an environment
-dict, and a working directory. A harness differs only in how the model id, the
-auth key, the (optional) base URL, and per-role restrictions map onto those
-primitives. So a harness is DATA, not code: one ``HarnessConfig`` plus one
-``render`` function covers any headless CLI agent. Adding a harness means
-authoring a ``HarnessConfig`` — zero framework code. Two ship today
-(``CLAUDE_CODE``, ``OPENCODE``); ``REGISTRY`` is the list, and naming any other
-agent here would promise support the registry cannot keep.
+A harness maps the model id, the auth key, the optional base URL and the
+per-role restrictions onto the three primitives every headless CLI agent shares:
+an argv list, an environment dict and a working directory. ``REGISTRY`` is what
+ships, and naming an agent here the registry does not carry promises support it
+cannot keep.
 
 The structured-output contract lives in the role prompt (templates/*.md tell the
 agent to end with a fenced json block), not a CLI flag, so one shared parser
-(``agent.base.extract_structured``) works across harnesses. Note: OpenCode's
-``--format json`` is a streaming event stream, not a final-result shape, so the
-fenced-block parser is the cross-harness contract; do not enable ``--format json``.
+(``agent.base.extract_structured``) works across harnesses. OpenCode's
+``--format json`` is a streaming event stream rather than a final-result shape;
+do not enable it.
 
-Shipped configs (``CLAUDE_CODE``, ``OPENCODE``) are verified-against-current-docs
-STARTING POINTS, not gospel. Harness flags churn (OpenCode has open headless
-bugs); the installer skill doc-verifies the chosen harness's current flags at
-install time. Per-role restriction specifics that could not be verified are left
-for the operator to fill rather than fabricated here.
+Harness flags churn, so the installer skill doc-verifies the chosen harness's
+current flags at install time.
 """
 import json
 import os
@@ -48,7 +42,6 @@ class AgentRun:
     duration_s: float = 0.0
 
 
-# A runner executes a built argv with an env overlay in cwd, returns an AgentRun.
 # Injected so command construction + env are testable without the CLI installed.
 Runner = Callable[[Sequence[str], Mapping[str, str], Path], AgentRun]
 
@@ -118,8 +111,7 @@ class HarnessConfig:
     # what every role has. The read-only roles are the case: `--add-dir ..`
     # widens their READS to the whole target, so what keeps them read-only is
     # denying the file-writing tools outright — `Edit(./**)` is cwd-relative and
-    # covers the loop tree alone. Those three names sat outside the guard's
-    # reach, so deleting the entire read-only write denial passed every test.
+    # covers the loop tree alone.
     role_denial: dict[AgentRole, tuple[str, ...]] = field(default_factory=dict)
     # Per-role command that must exit 0 before the role runs. For a harness that
     # selects its restriction by name, where an unresolved name falls back to an
@@ -172,10 +164,6 @@ class ConfiguredAgent(AgentAdapter):
         A non-empty config proves someone filled it in, not that the values
         restrict anything: a flag the CLI silently ignores reads identically to
         a working one. This checks what the values do.
-
-        A harness declaring no denial is refused rather than defaulted, because
-        each harness spells its deny flag differently and a wrong guess is the
-        failure this prevents.
         """
         flag, tools = self._harness.required_denial
         try:
@@ -187,7 +175,7 @@ class ConfiguredAgent(AgentAdapter):
             ) from None
         # Split into entries and compare whole names. `tool in value` is a
         # substring test, and every way of weakening this flag stays a superstring
-        # of the thing it used to deny: `Bash(rm:*)` scopes it, `BashOutput` is a
+        # of the tool it names: `Bash(rm:*)` scopes it, `BashOutput` is a
         # different tool, and prose describing the deny satisfies it outright. The
         # guard would then pass while the role holds a live shell and both tokens.
         denied = {entry.strip() for entry in value.split(",")}
@@ -256,26 +244,13 @@ class ConfiguredAgent(AgentAdapter):
         return result.stdout
 
 
-# --- Verified example configs (starting points; flags doc-verified at install) ---
-# Sources: code.claude.com/docs/en/headless + settings; opencode.ai/docs/cli.
-# Diagnose/Review are read-only; Fix may edit files, never run commands.
+# Flag sources: code.claude.com/docs/en/headless + settings; opencode.ai/docs/cli.
 
-# Denied for EVERY role, because a deny rule is the only thing a permission mode
-# cannot override, and no role in this loop needs any of them. Bash closes the
-# built-in read-only command set that would otherwise let an injected prompt
-# read the token out of the environment; WebFetch and WebSearch are direct
-# egress; Agent spawns a subagent whose own frontmatter may carry a different
-# permission mode, which is an unverified escalation path — denying it means the
-# question never has to be answered.
-#
-# `Edit(./**)` is the loop's own tree. The agent's cwd is the installed loop —
-# the gate that judges its diff, the CLI that runs it, the scrubber, loop.py —
-# and an edit-permitting mode auto-approves writes in the working directory, so
-# without this a prompt carrying log-derived text can have the fix rewrite the
-# gate that is about to grade it. Cwd-relative on purpose: this is the loop tree
-# and nothing else, while the target's own source is one level up and stays
-# editable. `Edit(...)` is the binding form — it covers every file-editing tool,
-# and a `Write(...)` path rule is ignored by file permission checks entirely.
+# Denied for EVERY role. `Edit(./**)` is cwd-relative on purpose: it covers the
+# loop's own tree — the gate that judges the diff, the CLI that runs it, the
+# scrubber, loop.py — while the target's own source one level up stays editable.
+# `Edit(...)` is the binding form; it covers every file-editing tool, and a
+# `Write(...)` path rule is ignored by file permission checks entirely.
 _DENIED = ("--disallowedTools", "Bash,WebFetch,WebSearch,Agent,Edit(./**)")
 
 # The read-only roles are handed the target's source to read, one level up from
@@ -296,27 +271,21 @@ _TARGET_SOURCE = ("--add-dir", "..")
 
 CLAUDE_CODE = HarnessConfig(
     name="claude-code",
-    # Pinned, like OpenCode below and for the same reason: the runner installs
-    # this fresh every cycle, so a floating spec makes the loop's behaviour a
-    # function of the date. What breaks across releases is exactly what this
-    # framework rests on — argv flags and permission semantics. `--max-turns`
-    # was removed from this CLI once already. The npm tag to read is `stable`;
+    # Pinned: the runner installs this fresh every cycle, and what churns across
+    # releases is exactly what this framework rests on — argv flags and
+    # permission semantics. The npm tag to read when bumping is `stable`;
     # `latest` here tracks the same build as `next`.
     install=("npm", "i", "-g", "@anthropic-ai/claude-code@2.1.236"),
     argv=("claude", "-p", "{prompt}"),
     role_argv={
-        # dontAsk is the documented locked-down-CI mode, replacing `plan` — the
-        # interactive explore-then-approve mode, which has a documented case
-        # where it does not block edits, so the two roles reading untrusted logs
-        # were not reliably read-only.
-        #
-        # But dontAsk is NOT deny-by-default in the absolute sense: a built-in
-        # read-only Bash set (echo, cat, grep, find, ...) runs unprompted in
-        # EVERY mode and cannot be configured off except by an explicit deny.
-        # Without _DENIED below, an injected log line could have a read-only
-        # role run `echo $ANTHROPIC_AUTH_TOKEN` — the agent inherits the
-        # runner's whole environment — and put the value in issue_body, which
-        # the workflow then posts to a GitHub issue.
+        # dontAsk is the documented locked-down-CI mode, and it is NOT
+        # deny-by-default in the absolute sense: a built-in read-only Bash set
+        # (echo, cat, grep, find, ...) runs unprompted in EVERY mode and cannot
+        # be configured off except by an explicit deny. Without the denials
+        # below, an injected log line could have a read-only role run
+        # `echo $ANTHROPIC_AUTH_TOKEN` — the agent inherits the runner's whole
+        # environment — and put the value in issue_body, which the workflow
+        # then posts to a GitHub issue.
         AgentRole.DIAGNOSE: (
             "--permission-mode",
             "dontAsk",
@@ -336,7 +305,7 @@ CLAUDE_CODE = HarnessConfig(
         # Note --allowedTools is an allow-RULE list, not a restriction on which
         # tools exist: every other tool stays in context and is governed by the
         # mode. That is why the deny list, not the allow list, is what bounds
-        # this role. The workflow — not the agent — runs tests and git.
+        # this role.
         AgentRole.FIX: (
             "--permission-mode",
             "acceptEdits",
@@ -372,8 +341,6 @@ CLAUDE_CODE = HarnessConfig(
     # which wins over this.
     auth_env="ANTHROPIC_AUTH_TOKEN",
     base_url_env="ANTHROPIC_BASE_URL",
-    # Checked against the rendered argv for every role, so trimming any name
-    # from _DENIED above fails the guard rather than quietly widening the agent.
     required_denial=(
         "--disallowedTools",
         ("Bash", "WebFetch", "WebSearch", "Agent", "Edit(./**)"),
@@ -398,35 +365,16 @@ OPENCODE = HarnessConfig(
     argv=("opencode", "run", "--pure", "--model", "{model}", "{prompt}"),
     # Restriction is per-agent and lives in `opencode.json`; argv only selects
     # which agent runs. That file sits at the loop root because this CLI
-    # discovers it from the working directory and offers no path override, so
-    # it is the one harness-specific file in an otherwise harness-agnostic
-    # tree. It is inert on a target using any other harness. Denying a tool
-    # removes it from the agent's context rather than prompting for it, so a
-    # read-only role has no write or shell tool to call.
+    # discovers it from the working directory and offers no path override, so it
+    # is the one harness-specific file in an otherwise harness-agnostic tree,
+    # inert on a target using any other harness. Denying a tool there removes it
+    # from the agent's context rather than prompting for it.
     #
-    # Rules are last-match-wins, so each agent's permission block opens with the
-    # `"*": "deny"` catch-all and allows back only what that role needs. Three
-    # keys carry the whole design, and each fails in its own direction:
-    #
-    # - `external_directory` must be set explicitly on every agent. The roles
-    #   work on the target's source at `../`, and the built-in default for this
-    #   key is `ask` — which, headless, suspends the run until the job timeout
-    #   kills it with no output naming the cause.
-    # - `edit` is Fix's alone, and is path-scoped rather than a bare "allow":
-    #   a `"*": "allow"` followed by a deny per protected tree, the current set
-    #   being in the file rather than restated here. Fix's cwd IS the loop, so
-    #   an unscoped allow lets it rewrite the gate about to judge it. Every
-    #   deny is written AFTER the wildcard allow because last match wins; their
-    #   order among themselves does not matter, since the patterns are disjoint.
-    # - No role allows `bash`, `webfetch` or `websearch`: a read-only role needs
-    #   no shell to exfiltrate, only the key in its environment and somewhere to
-    #   POST it.
-    #
-    # `--agent <name>` selects the role and MUST be paired with the preflight
-    # below: `run` treats an unresolved name as a warning and continues under the
-    # unrestricted default agent, while `debug agent` exits non-zero on the same
-    # input. That preflight is also how this harness satisfies the restriction
-    # guard, since its denial lives in a file rather than in argv.
+    # `--agent <name>` MUST be paired with the preflight below: `run` treats an
+    # unresolved name as a warning and continues under the unrestricted default
+    # agent, while `debug agent` exits non-zero on the same input. That preflight
+    # is also how this harness satisfies the restriction guard, since its denial
+    # lives in a file rather than in argv.
     role_argv={
         AgentRole.DIAGNOSE: ("--agent", "shl-diagnose"),
         AgentRole.FIX: ("--agent", "shl-fix"),
@@ -437,20 +385,17 @@ OPENCODE = HarnessConfig(
         AgentRole.FIX: ("opencode", "debug", "agent", "shl-fix"),
         AgentRole.REVIEW: ("opencode", "debug", "agent", "shl-review"),
     },
-    # Model rides in --model argv, and must name the provider PLAN, not just the
-    # vendor: `zai-coding-plan/glm-5.2` on the international plan,
-    # `zhipuai-coding-plan/glm-5.2` on the China one, never `zhipuai/glm-5.2`. A
-    # model id pointing at an endpoint the credential does not cover retries
-    # rather than erroring, so the symptom is a hung cycle. Auth uses the
-    # provider's native env var, named by the operator via ModelConfig.auth_env
-    # — no fixed default.
+    # Model rides in --model argv and must name the provider PLAN, not just the
+    # vendor; `reference/harnesses.md` carries the forms. A model id pointing at
+    # an endpoint the credential does not cover retries rather than erroring, so
+    # the symptom is a hung cycle. Auth uses the provider's native env var, named
+    # by the operator via ModelConfig.auth_env — no fixed default.
     model_env=(),
     auth_env="",
     base_url_env="",
 )
 
-# Registry of shipped configs. The workflow picks one by name from the
-# SHL_HARNESS env var; adding a harness = add a HarnessConfig + an entry here.
+# The workflow picks one by name from the SHL_HARNESS env var.
 REGISTRY: dict[str, HarnessConfig] = {
     "claude-code": CLAUDE_CODE,
     "opencode": OPENCODE,

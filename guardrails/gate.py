@@ -15,13 +15,7 @@ a test's call site to a safe code path) are closed elsewhere: the frozen test
 is tamper-proof via `is_frozen_test_touched`, and red-then-green is enforced by
 the workflow's Red/Green steps plus `--repro-rc`. The residual ceiling is a
 semantic rewrite of a NON-frozen test; AST-diff is the upgrade. Residual risks
-are listed in the self-healing-loop repo's own development guide.
-
-Named rather than pointed at, because this module is read from two places and a
-relative path is wrong in one of them: here `../CLAUDE.md` is that development
-guide, but the file is VENDORED to `target/.shl/guardrails/`, where the same
-path resolves to the loop agent's operating doc — which carries no residual
-risks at all.
+are listed in the self-healing-loop repo's `docs/risks.md`.
 """
 import re
 from fnmatch import fnmatchcase
@@ -56,8 +50,7 @@ _DEFAULT_TEST_GLOBS = (
 # Editing the runner's config silences a test as effectively as deleting its
 # assertions, so these are frozen too. Listing Python's files alone leaves a JS
 # fix free to add an `exclude` entry to vitest.config.ts and walk straight past
-# the frozen test. `package.json` counts: it carries the `test` script and
-# often the jest block.
+# the frozen test.
 _DEFAULT_TEST_CONFIG_GLOBS = (
     # Python
     "conftest.py",
@@ -81,14 +74,8 @@ _DEFAULT_TEST_CONFIG_GLOBS = (
     # Ruby, Rust, JVM. Go is deliberately absent: `go test` is configured by the
     # test files themselves rather than by a manifest, so there is no equivalent
     # file to freeze — naming Go here would claim a coverage that has no target.
-    # Added because both agent-facing prompts already tell
-    # the agent the gate refuses these, and the gate did not — so on exactly the
-    # stacks where the installer is least likely to supply
-    # `SHL_TEST_CONFIG_GLOBS`, the promise was false and the file unpoliced.
-    # Widening the built-in was the right direction rather than narrowing the
-    # prose: the prose describes the category correctly, and `package.json` had
-    # already settled that a dependency manifest counts.
-    # The framework's own suite pins this list and the prose together.
+    # Both agent-facing prompts tell the agent the gate refuses these, and the
+    # framework's own suite pins this list and that prose together.
     ".rspec",
     "Rakefile",
     "Cargo.toml",
@@ -162,9 +149,9 @@ def _header_pair(line: str) -> Optional[tuple[str, str]]:
 
     An empty side means the line names only the other one: ``--- a/x`` fixes the
     old path and says nothing about the new. Every reader of a diff header goes
-    through here. The last time two of them restated these patterns separately,
-    one learned to decode git's quoting and the other did not, so an accented
-    filename was policed by half the checks.
+    through here: two of them restating these patterns separately drift, one
+    decoding git's quoting and the other not, and an accented filename is then
+    policed by half the checks.
     """
     match = _DIFF_HEADER_RE.match(line)
     if match:
@@ -212,8 +199,8 @@ def is_test_weakened(
 
     Returns the reason rather than printing it: this is a pure function with
     several call sites, and a blocked cycle has to be able to say what it caught
-    or the block is unreadable in the evidence bundle. None stays falsy, so
-    every truthiness call site reads the same as it did against a bool.
+    or the block is unreadable in the evidence bundle. None stays falsy, so a
+    truthiness call site reads the same.
     """
     old_file = ""
     new_file = ""
@@ -265,11 +252,11 @@ def is_frozen_test_touched(diff_text: str, frozen_path: str) -> Optional[str]:
     The repro test Diagnose specified is written by the workflow and proven red
     on the broken code BEFORE Fix runs. Fix must make it pass by changing
     source, never by editing it — so any change to that file in Fix's diff is a
-    freeze violation. This is what closes the call-site-swap bypass (H4): Fix
-    cannot rewire a test it is forbidden to touch.
+    freeze violation. This is what closes the call-site-swap bypass: Fix cannot
+    rewire a test it is forbidden to touch.
 
     Parsed through ``_header_paths`` rather than matched as raw substrings.
-    Comparing the frozen path against the unparsed header text missed every
+    Comparing the frozen path against the unparsed header text misses every
     C-quoted name, so a frozen test with any non-ASCII byte in it — the ordinary
     case wherever contributors do not write in English — could be edited freely
     while the pass line attested that it had not been.

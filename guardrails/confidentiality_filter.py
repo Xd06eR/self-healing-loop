@@ -113,8 +113,8 @@ def scrub(
     Three sources, because each alone has a gap: literal values for secrets
     this process holds (format-proof, but blind to anything outside its own
     environment), shape patterns for the common credential formats, and the
-    operator's own patterns for the names only they know. ``extra_patterns``
-    stays for in-process callers; the variable is what an install can set.
+    operator's own patterns for the names only they know. ``extra_patterns`` is
+    for in-process callers; the variable is what an install can set.
     """
     out = text
     for value in _environment_secrets():

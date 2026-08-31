@@ -19,42 +19,33 @@ def hydrate_repo_vars() -> None:
 
     An adapter may read any `SHL_*` name, but a repo variable reaches a step
     only if that step's `env:` block names it — and the workflow templates can
-    only name variables the framework knows about. An adapter needing a project
-    id or a region therefore reads None while the variable sits correctly set in
-    the repo settings, which surfaces as `read_log` raising every tick or
-    `health_check` silently verifying nothing.
-
-    Re-vendoring is the other half: a fresh copy of a template drops any `env:`
-    line an installer added by hand, and the loop goes quiet with no error.
-    Carrying the whole context as one JSON blob removes both failures rather
-    than detecting them, because there is no per-variable wiring left to omit.
+    only name variables the framework knows about, so a variable an adapter
+    invents reads None while sitting correctly set in the repo settings.
 
     Explicit `env:` entries win, so a step can still override one value without
-    the bulk context undoing it. Scope worth knowing: `secrets.*` is a separate
-    Actions context and is not part of `toJSON(vars)`, so no secret travels this
-    path, and the evidence bundle records env key names only, never values.
+    the bulk context undoing it. `secrets.*` is a separate Actions context and
+    is not part of `toJSON(vars)`, so no secret travels this path.
     """
     raw = os.environ.get("SHL_VARS")
     if not raw:
-        # Absent is ordinary: local runs and installs predating this have no
-        # blob, and their explicit env entries are complete on their own.
+        # Absent is ordinary: a local run has no blob, and explicit env entries
+        # are complete on their own.
         return
     try:
         supplied = json.loads(raw)
     except json.JSONDecodeError as exc:
-        # Present but unreadable is a configuration error, and this function
-        # exists to remove a silent "set correctly, absent at runtime" failure.
-        # Degrading quietly reinstates exactly that, one layer further from the
-        # cause: read_log raises every tick with nothing naming SHL_VARS.
+        # Degrading quietly here reinstates the silent "set correctly, absent at
+        # runtime" failure this function exists to remove, one layer further
+        # from the cause: read_log raises every tick with nothing naming
+        # SHL_VARS.
         raise ValueError(f"SHL_VARS is set but is not valid JSON: {exc}") from exc
     if not isinstance(supplied, dict):
         raise ValueError(f"SHL_VARS must be a JSON object, got {type(supplied).__name__}")
     for key, value in supplied.items():
-        # Only the framework's own namespace, matching the contract above. The
-        # blob carries organization-level variables too, inherited by every repo
-        # in the org, so an unfiltered fold would let an unset NODE_OPTIONS,
-        # PYTHONPATH or GIT_SSH_COMMAND set anywhere in the org silently change
-        # how this loop's subprocesses run.
+        # Only the framework's own namespace. The blob carries organization-level
+        # variables too, inherited by every repo in the org, so an unfiltered
+        # fold would let a NODE_OPTIONS, PYTHONPATH or GIT_SSH_COMMAND set
+        # anywhere in the org change how this loop's subprocesses run.
         if not key.startswith("SHL_"):
             continue
         # Never re-materialise a name a step deliberately withheld. A provider
@@ -85,10 +76,7 @@ def optional_ids_fn():
 
     Every consumer of a fingerprint resolves it through here rather than
     accepting one as a parameter, so issue dedup, the attempt cap, incident
-    recall and the recorded incident all key a failure the same way. Keying them
-    differently is invisible from outside: memory stores identities nothing will
-    ever look up, and an empty recall reads exactly like a project that has
-    never failed before.
+    recall and the recorded incident all key a failure the same way.
 
     Only the ADAPTER's own absence is optional. A bare `except ImportError`
     draws the line somewhere else: it also swallows an import raised inside the

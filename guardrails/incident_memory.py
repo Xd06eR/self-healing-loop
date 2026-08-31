@@ -2,10 +2,9 @@
 
 Records are matched on FINGERPRINTS (exception type + raise site, from
 ``log_compact.failure_fingerprints``), never on the human-written title. The
-title is prose: it varies every cycle because a model wrote it, so matching on
-it recognizes nothing. The fingerprint is derived from the same RAW log on
-both sides — never the compacted signal, whose dropped frames are exactly what
-an identity is built from — so an identical failure keys identically.
+fingerprint is derived from the same RAW log on both sides — never the compacted
+signal, whose dropped frames are exactly what an identity is built from — so an
+identical failure keys identically.
 """
 import json
 from dataclasses import asdict, dataclass, field
@@ -58,12 +57,10 @@ def _prune(log_path: Path, max_records: int) -> None:
     and adds one, so those commits do carry a whole-file diff — the cost of a
     bounded append-only store, paid only after 500 healed cycles.
 
-    A `reverted` record is exempt because it is the highest-value thing memory
-    holds — it says the obvious fix was already tried and made things worse.
-    `format_incidents` ranks those ahead of everything else so the PROMPT cap
-    can never drop the warning; pruning them here would defeat that from
-    underneath, and silently, since a missing incident looks like a bug nobody
-    has hit yet.
+    A `reverted` record is exempt at any age. `format_incidents` ranks those
+    ahead of everything else so the PROMPT cap can never drop the warning;
+    pruning them here would defeat that from underneath, and silently, since a
+    missing incident looks like a bug nobody has hit yet.
     """
     lines = [line for line in log_path.read_text().splitlines() if line.strip()]
     if len(lines) <= max_records:
@@ -112,10 +109,6 @@ def record_cycle(
     identities than the lookup derives, so the repeat this record exists to
     catch never matches it.
 
-    One implementation, called rather than reimplemented: a caller that builds
-    the record inline has to derive the fingerprint rule itself, and a rule two
-    places follow separately is one they eventually follow differently.
-
     The identities come from `optional_ids_fn`, the same source `recall_incidents`
     reads, so what is stored is what a later cycle will look up. On a runtime the
     built-in parsing cannot read, deriving them here instead would store an empty
@@ -128,9 +121,8 @@ def record_cycle(
     append-only, exempt from pruning once an outcome is `reverted`, and
     re-rendered into every later matching prompt — so it is the longest-lived
     copy of that text anywhere. `heal.yml` scrubs the issue title, the issue
-    body, the PR summary and the review reason on their way to GitHub and
-    handed this one through raw, which is exactly what a rule every caller must
-    remember produces. Scrubbing at the seam means no caller can forget.
+    body, the PR summary and the review reason on their way to GitHub;
+    scrubbing at this seam means no caller can forget the fifth.
     """
     entry = IncidentRecord(
         issue_id=issue_id,
@@ -159,8 +151,7 @@ def search_similar(
     A list, never a bare string, and the refusal is explicit because neither
     wrong reading of a string is loud: as one identity it matches nothing, and
     to ``set()`` it is a bag of characters that matches nothing either. Both
-    read as "this failure is new", which is the shape of the defect that left
-    this mechanism dead behind four passing tests.
+    read as "this failure is new".
     """
     if isinstance(fingerprints, str):
         raise TypeError(

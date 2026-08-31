@@ -6,8 +6,7 @@ rolling back are NOT the adapter's job — the workflow runs the operator's
 should never hold) and reverts with `git revert`. They are absent rather than
 abstract-with-no-caller: nothing in the framework would ever call them, so
 declaring them here only forces every installer to write two dead methods to
-satisfy the ABC, and any guidance about mocking them is guidance about code
-that cannot run.
+satisfy the ABC.
 """
 from abc import ABC, abstractmethod
 from typing import Optional
@@ -51,14 +50,12 @@ class TargetAdapter(ABC):
         identity and compacts only for the prompt.
 
         Optional, and needed by any runtime the framework cannot read: it
-        understands Python tracebacks and V8 stacks, and nothing else. A Go
-        panic separates its trace from its message with a blank line, which
-        ends the block the line filter was collecting; a Ruby backtrace uses
-        its own frame syntax. Neither survives the built-in extraction, so
-        neither produces an identity — and
-        an identity is what issue dedup, incident recall and the attempt cap all
-        key on. Without one the loop refuses those failures rather than healing
-        the same one on every tick, forever.
+        understands Python tracebacks and V8 stacks, and nothing else. Neither
+        a Go panic nor a Ruby backtrace survives the built-in extraction, so
+        neither produces an identity — and an identity is what issue dedup,
+        incident recall and the attempt cap all key on. Without one the loop
+        refuses those failures rather than healing the same one on every tick,
+        forever.
 
         Return one string per distinct failure, shaped ``Type@path:line``.
         Three properties make it usable, and all three are this method's job:
