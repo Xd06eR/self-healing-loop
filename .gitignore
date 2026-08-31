@@ -4,7 +4,7 @@ guardrails/state/
 # never learns. Ignore everything else under the dir, keep the log.
 incident_memory/*
 !incident_memory/log.jsonl
-# Loop intermediates (N6): raw agent output may carry log-sourced client data —
+# Loop intermediates: raw agent output may carry log-sourced client data —
 # never commit them. Patterns are RELATIVE to this file's dir, which is the dir
 # the intermediates are written to (the repo root here, `.shl/`
 # once vendored) — so a bare `*.json` is correct; a `.shl/`-

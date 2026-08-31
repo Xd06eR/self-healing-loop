@@ -382,7 +382,7 @@ def is_test_config_touched(
 ) -> Optional[str]:
     """Name the test-runner config the diff touches, or None if it touches none.
 
-    N3: a frozen test is useless if Fix instead edits a test-config file to skip
+    A frozen test is useless if Fix instead edits a test-config file to skip
     it (conftest.py collect_ignore, vitest.config.ts exclude, a rewritten
     `test` script in package.json). Any diff touching one of these is a freeze
     violation, whether or not a frozen test is currently active.
