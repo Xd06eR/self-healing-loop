@@ -138,7 +138,8 @@ class VendoringManifestMatchesReality(unittest.TestCase):
         "reference",  # installer-only progressive disclosure
         "artifacts",  # templates for install output, filled then copied
         "loop_context",  # copied as CLAUDE.md/AGENTS.md, not as a directory
-        "tests",  # the framework's own tests — F12
+        "tests",  # the framework's own tests; a target collecting them blocks every cycle
+        "docs",  # development depth; the loop's agents read loop_context, not this
         "workflows",  # copied to .github/workflows, not into the loop dir
     }
 
