@@ -60,7 +60,10 @@ def build_prompt(role: AgentRole, context: dict) -> str:
             f"no context label for {unlabelled}; add one to _CONTEXT_LABELS or "
             f"the key is silently dropped from the prompt"
         )
-    parts = [_load_template(role), "", "## Context", ""]
+    # rstrip, so whether a template file happens to end with a newline cannot
+    # change the prompt. Without it an editor's "insert final newline" silently
+    # adds a blank line before the Context section, differently per role.
+    parts = [_load_template(role).rstrip("\n"), "", "## Context", ""]
     for key, label in _CONTEXT_LABELS.items():
         value = context.get(key)
         if value:

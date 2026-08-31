@@ -88,7 +88,7 @@ There is no headless install **by design**. Fitting a loop to a project settles 
 ## Docs
 
 - **`SKILL.md`** — the installer, Phases 0–11. Start here to install.
-- **`reference/`** — what the installer *reads*, loaded only on the branch it is on: `adapter.md` (which adapter methods this target needs), `harnesses.md` (the two harnesses and their credential paths), `platforms.md` (log surfaces, retention, per-platform recipes), `closing-gaps.md` (generating a test suite or an error relay), `updating.md` (refreshing a loop that is already installed), and `verifying-the-install.md`, which it reads only when asked and never runs.
+- **`reference/`** — what the installer *reads*, loaded on the branch it is on: `adapter.md` (which adapter methods this target needs), `harnesses.md` (the two harnesses and their credential paths), `platforms.md` (log surfaces, retention, per-platform recipes), `closing-gaps.md` (generating a test suite or an error relay), `updating.md` (refreshing a loop that is already installed), and `verifying-the-install.md`, which it reads only when asked and never runs.
 - **`artifacts/`** — what the installer *produces*: `setup.md` becomes the target's decision record, `report.md` becomes its install report, and `readme.md` becomes the `README.md` inside the loop directory for whoever meets it without expecting it. Filled in and copied; none is vendored.
 - **`templates/`** — the three role prompts (diagnose, fix, review) the loop uses at runtime. Vendored whole.
 - **`CLAUDE.md`** / **`AGENTS.md`** — the development guide for anyone working ON the framework: what it is, the loop, hard rules, and a map to everything below.
