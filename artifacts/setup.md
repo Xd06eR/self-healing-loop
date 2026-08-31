@@ -305,7 +305,7 @@ Re-installs append here. A prior decision is never overwritten; it is superseded
 What this loop does **not** protect you from. None is a bug to be fixed later; they are the boundaries of the design, worth knowing before the cron runs unattended against something you care about.
 
 - **The merge gate compares lines, not meaning.** It reliably catches a deleted assert, a skipped or expected-to-fail test, an edited test-runner config, and any edit to the frozen reproducing test. A determined semantic rewrite of some *other* test, one that still runs and still asserts but asserts something weaker, can pass it. The frozen test itself is tamper-proof, which is what makes the red-then-green proof trustworthy.
-- **The gate's language coverage is uneven, and it degrades quietly.** Three separate checks, each with a different reach:
+- **The gate's language coverage is uneven, and it degrades quietly.** Four separate checks, each with a different reach:
     - *Which files count as tests* — driven by globs, so it works on any language **provided `SHL_TEST_GLOBS` matches your convention**. Get this wrong and every check below polices nothing at all.
     - *Removing an assertion* — recognised where the assertion reads `assert`, `expect`, `raises` or `should_`, which covers Python, JS/TS, RSpec and most JVM matchers. **Go's `t.Error`/`t.Fatal` are not recognised.**
     - *Silencing a test* — recognised for `skip` and `xfail` forms, including Go's `t.Skip` and jest's `.skip`. **Not recognised: `xit(`, RSpec's `pending`, Rust's `#[ignore]`, JUnit's `@Disabled`.**
