@@ -610,7 +610,7 @@ class ABlockedCycleSaysWhatItCaught(unittest.TestCase):
 
     def test_a_frozen_test_with_no_exit_code_is_refused_rather_than_attested(self):
         # "untouched" is proven by the diff; "passing" is proven only by running
-        # it. The gate used to pass with a caveat, which puts a hedge in the
+        # it. A gate that passes with a caveat puts a hedge in the
         # evidence bundle where a refusal belongs — a cycle whose fix proof
         # never ran must not reach a merge decision at all.
         clean = "diff --git a/src/x.py b/src/x.py\n+ok\n"
@@ -623,8 +623,8 @@ class BothEntryPointsReadTheSameDashConvention(unittest.TestCase):
     """`-` means stdin, and the rule lives in one place for both CLIs.
 
     `loop.py` and this module are separate command-line surfaces the workflows
-    drive with one convention, and each used to implement it — they had already
-    drifted on a missing argument. The module docstring here advertises `-` for
+    drive with one convention. Implemented separately in each, they drift, and
+    the missing-argument case is where they diverge first. The module docstring here advertises `-` for
     every path argument, so it is an interface, not an incidental.
     """
 
@@ -657,9 +657,9 @@ class BothEntryPointsReadTheSameDashConvention(unittest.TestCase):
 class TheSuiteExitCodeIsCheckedWithoutABaselinePair(unittest.TestCase):
     """A crashed suite must not read as green just because no baseline was given.
 
-    The cross-check used to sit inside the `--baseline`/`--current` block, so a
-    hand invocation — which the module docstring documents as supported — got
-    exit 0 whatever `--suite-rc` said. The condition it tests is about the
+    The cross-check must sit outside the `--baseline`/`--current` block. Inside
+    it, a hand invocation — which the module docstring documents as supported —
+    gets exit 0 whatever `--suite-rc` said. The condition it tests is about the
     PARSED failure list being empty, and an absent `--current` is the emptiest
     that list ever gets.
     """

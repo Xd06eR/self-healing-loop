@@ -10,7 +10,7 @@ Return the Phase 2 log surface as text.
 
 Every log the project's own code writes, third-party and vendored trees excluded: Diagnose will happily root-cause a traceback from a tree the project does not own, then write a fix for somebody else's package. Tail or filter to recent error-bearing lines. The framework compacts further, but do not hand it a multi-MB raw log.
 
-**One combination to refuse: never both run the test suite and read a hosted log from inside `read_log`.** Sources otherwise compose freely — this returns a string, so concatenating two is fine — but running the suite here executes **agent-authored code**, namely previous cycles' merged reproducing tests, which were written from untrusted logs. The workflow hands this step `SHL_LOG_TOKEN` so a host-log adapter can authenticate, so an adapter doing both puts a live platform credential in reach of code an agent wrote, on every tick, with no diff for the gate to inspect. Pick one: read the hosted log, or run the suite. If the target genuinely needs both signals, the suite half belongs in CI going red, which the loop reads as a log surface without holding a credential.
+**One combination to refuse: never both run the test suite and read a hosted log from inside `read_log`.** Sources otherwise compose freely, since this returns a string and concatenating two is fine, but running the suite here executes **agent-authored code**, namely previous cycles' merged reproducing tests, which were written from untrusted logs. The workflow hands this step `SHL_LOG_TOKEN` so a host-log adapter can authenticate, so an adapter doing both puts a live platform credential in reach of code an agent wrote, on every tick, with no diff for the gate to inspect. Pick one: read the hosted log, or run the suite. If the target genuinely needs both signals, the suite half belongs in CI going red, which the loop reads as a log surface without holding a credential.
 
 ## `failing_tests()` — implement it
 
@@ -28,7 +28,7 @@ Built-in parsing reads Python tracebacks and V8 stacks. Every other runtime yiel
 
 **What you return is published, and it is not redacted for you.** The identity goes into the dedup marker on a GitHub issue and into the incident log the loop commits to the default branch. Running it through the scrubber is not an option: `panic@handler.go:42` is exactly the shape of an email address, so redaction would rewrite it and collapse every distinct failure onto one key. Key on the type and the frame; never let the message payload into the string. That is the same rule as "stable" below, seen from the other side — a value that varies between two occurrences of one bug is also a value carrying whatever the log happened to put there.
 
-**It is handed the raw log, never the compacted signal the agent is prompted with.** The workflow carries both: compacted text into the prompt, raw text to everything that derives an identity. So key on whatever the log actually contains — frames, goroutine headers, whatever your runtime prints — without checking whether compaction would have kept it.
+**It is handed the raw log, never the compacted signal the agent is prompted with.** The workflow carries both: compacted text into the prompt, raw text to everything that derives an identity. So key on whatever the log actually contains (frames, goroutine headers, whatever your runtime prints) without checking whether compaction would have kept it.
 
 **Find out which case this target is in.** Save a real failure log the project has actually produced, then ask the seam the workflow asks:
 
@@ -42,7 +42,7 @@ print('REFUSED — implement failure_ids' if unfingerprintable(raw, ids_fn=optio
 "
 ```
 
-The three properties an identity needs — stable, specific, project-owned — and what `None` and `[]` each mean are in `adapters/base.py`'s docstring, beside the method you are implementing.
+The three properties an identity needs (stable, specific, project-owned) and what `None` and `[]` each mean are in `adapters/base.py`'s docstring, beside the method you are implementing.
 
 ## `health_check()` — implement it if the target deploys anywhere
 

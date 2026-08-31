@@ -106,8 +106,8 @@ class AnAdapterSeesEveryVariableTheOperatorSet(unittest.TestCase):
 class NoDocClaimsHydrationDeliversASecret(unittest.TestCase):
     """`hydrate_repo_vars` skips `SECRET_ENV_VARS` — docs must not say otherwise.
 
-    The reason a secret is a secret used to be explained with the wrong
-    mechanism: docs claimed `SHL_VARS` folds a stored-as-variable credential
+    The reason a secret is a secret invites the wrong
+    mechanism: a doc that claims `SHL_VARS` folds a stored-as-variable credential
     into the adapter's environment, when hydration is exactly the path that
     refuses those names. The true route is the raw job-level blob sitting in
     every step's environment. A wrong mechanism in a security rationale is

@@ -1321,7 +1321,7 @@ class NoDocClaimsAPatternTheGateDoesNotHave(unittest.TestCase):
 class TheReadmeStatesTheRealAttemptCap(unittest.TestCase):
     """`.shl/README.md` names the cap as a number, so the number has to be right.
 
-    It used to be a `{{ATTEMPT_CAP}}` placeholder, which invited the installer
+    A `{{ATTEMPT_CAP}}` placeholder here would invite the installer
     to invent a value: nothing configures the cap, `loop.under_attempt_cap`
     hard-codes it. Writing the literal removes that invitation and creates the
     opposite risk — the constant moves and the sentence the operator reads goes

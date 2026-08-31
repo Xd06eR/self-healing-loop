@@ -8,7 +8,7 @@ Nothing here names a platform as the expected case. Every hosted platform answer
 
 The choice decides which class of bug the loop can ever heal. They **compose**: `read_log` returns a string, so it can concatenate sources.
 
-**With one exception, and it is a credential boundary rather than a preference.** A `read_log` that both runs the target's test suite and reads a hosted log is the one combination to refuse. Running the suite inside `read_log` executes agent-authored code — previous cycles' merged reproducing tests, written from untrusted logs — and the step that calls `read_log` is handed `SHL_LOG_TOKEN` so a host-log adapter can authenticate. Composing those two puts a live platform credential in reach of code an agent wrote. Use two sources of any other pair freely; for this one, pick a side. Full reasoning: [adapter.md](adapter.md).
+**With one exception, and it is a credential boundary rather than a preference.** A `read_log` that both runs the target's test suite and reads a hosted log is the one combination to refuse. Running the suite inside `read_log` executes agent-authored code (previous cycles' merged reproducing tests, written from untrusted logs), and the step that calls `read_log` is handed `SHL_LOG_TOKEN` so a host-log adapter can authenticate. Composing those two puts a live platform credential in reach of code an agent wrote. Use two sources of any other pair freely; for this one, pick a side. Full reasoning: [adapter.md](adapter.md).
 
 | family | what it is | catches | costs |
 |---|---|---|---|
@@ -68,7 +68,7 @@ Read the platform's own docs for two facts, then answer the rows.
 1. The log command or API, and whether it takes a `--since`-style watermark.
 2. The runtime log retention, which sets the cron.
 
-Only three rows are platform facts. Everything else the loop needs — the setup and test commands, the repro path, the test globs, whether a deploy command exists at all — comes from Phase 1 discovery and is owned by `artifacts/setup.md`, which is the table the operator actually runs. Restating them here is how the two copies drift.
+Only three rows are platform facts. Everything else the loop needs (the setup and test commands, the repro path, the test globs, whether a deploy command exists at all) comes from Phase 1 discovery and is owned by `artifacts/setup.md`, which is the table the operator actually runs. Restating them here is how the two copies drift.
 
 | row | value |
 |---|---|

@@ -65,7 +65,7 @@ This is the gap that **changes the product**: closing it adds a public HTTP endp
 
     Without these, anyone can post arbitrary text and make the loop diagnose it, file issues and burn agent calls. Note in the report that per-instance rate limiting only thins a flood on serverless.
 - [ ] **Never let reporting an error throw.** The user is already looking at a broken page; a failure here turns one lost error into two.
-- [ ] If the platform serves minified code, enable published sourcemaps and resolve frames **before `read_log` returns**. Load-bearing, not cosmetic: unresolved frames carry a per-build hash, so an identical failure fingerprints differently on every deploy and incident memory can never match.
+- [ ] If the platform serves minified code, enable published sourcemaps and resolve frames **before `read_log` returns**, for the reason [platforms.md](platforms.md) gives: unresolved frames kill incident memory outright.
 - [ ] If the platform deploys on push, render the deployed commit into the served output so `health_check` can prove the merged commit is live rather than that the site answers.
 
 Per-platform specifics: [platforms.md](platforms.md).
@@ -74,11 +74,7 @@ Per-platform specifics: [platforms.md](platforms.md).
 
 ## The credential trap
 
-**One `read_log` must not both run the suite and read a hosted log.**
-
-Running the suite inside `read_log` means `read_log` executes **agent-authored code**: previous cycles' merged repro tests, written from untrusted logs. The workflow hands that step `SHL_LOG_TOKEN` so a host-log adapter can authenticate, so an adapter that does both puts a live platform credential in reach of code an agent wrote. That is the one combination to refuse.
-
-Two consequences for the adapter you generate:
+**One `read_log` must not both run the suite and read a hosted log.** [adapter.md](adapter.md) owns that rule and the reasoning; two consequences bind the adapter you generate here:
 
 - If the failure surface is a hosted log, `read_log` reads **only** that. It never falls back to running the suite when the log comes back empty, however tempting that looks — an empty log is information, and the fallback is what turns a missing credential into a silent, permanent idle.
 - If the failure surface is the suite, `read_log` runs the suite and the operator sets no `SHL_LOG_TOKEN` at all. Nothing to leak.

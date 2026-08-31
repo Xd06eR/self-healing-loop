@@ -2,7 +2,7 @@
 
 Fix the root cause in SOURCE code, not the symptom.
 
-Your context carries the issue Diagnose filed, any matching incident-memory entries, and — **only when Diagnose could reproduce the failure** — the frozen reproducing test, already written and already proven red. Most runtime failures do not reduce to a deterministic test, so on many cycles there is no frozen test and no such path; if your context does not name one, none exists and the issue is the whole specification.
+Your context carries the issue Diagnose filed, any matching incident-memory entries, and, **only when Diagnose could reproduce the failure**, the frozen reproducing test, already written and already proven red. Most runtime failures do not reduce to a deterministic test, so on many cycles there is no frozen test and no such path; if your context does not name one, none exists and the issue is the whole specification.
 
 **The target's source is not in your context. Read it.** Your working directory is the loop's own folder, the project is one level up, and every path you are shown is relative to the project root rather than to where you stand. Fixing from the issue text alone is how a plausible patch lands on the wrong function.
 

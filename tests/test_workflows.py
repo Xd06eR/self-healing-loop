@@ -405,8 +405,8 @@ class GitsOwnExecutionSurfaceIsWatched(unittest.TestCase):
     def test_the_verdict_rests_on_a_step_output_not_on_a_file(self):
         """$RUNNER_TEMP is outside the checkout and still writable by the agent.
 
-        The snapshot comment used to offer "outside the checkout" as the reason
-        the record was safe. It is not a permission boundary: nothing in either
+        The snapshot comment must not offer "outside the checkout" as the reason
+        the record is safe. It is not a permission boundary: nothing in either
         harness denies writes there, so the payload that restores `.git/config`
         can rewrite the baseline in the same breath. A completed step's outputs
         cannot be rewritten by a later step, which is the property this needs.
@@ -2283,7 +2283,7 @@ class AFailedHealthProbeStillReachesRollback(unittest.TestCase):
         self.assertNotIn("rc=0", written, "reported a passing suite without running one")
 
     def test_an_unset_test_command_refuses_instead_of_verifying_nothing(self):
-        """Empty, this body used to be a parse error that took Rollback with it.
+        """Empty, this body is a parse error that takes Rollback with it.
 
         Both are gated on this step succeeding, so the cycle merged, deployed,
         and recorded nothing — the same end state as a crashed Review, from a

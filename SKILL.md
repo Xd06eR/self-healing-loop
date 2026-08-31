@@ -17,7 +17,7 @@ Installs the loop into the repo this skill runs in. After install, a GitHub Acti
 
 > A fact may be **determined** only if getting it wrong would be **visible**. If a wrong answer is indistinguishable from a correct one, it is **asked**, however strong the evidence looks.
 
-**Never spend a question on something the repo answers.** A question the filesystem could have answered trains the operator to stop reading the ones that matter. The mechanical half of the install — vendoring, the manifest, the gitignore, the workflows, the gate's own rules — is yours to do, never to ask about.
+**Never spend a question on something the repo answers.** A question the filesystem could have answered trains the operator to stop reading the ones that matter. The mechanical half of the install (vendoring, the manifest, the gitignore, the workflows, the gate's own rules) is yours to do, never to ask about.
 
 **Reliability over speed.** Several rounds is the expected shape, not a failure.
 
@@ -37,7 +37,7 @@ Load a reference file only on the branch you are on. None of them is vendored; t
 - `.shl/` — the vendored core, copied as-is. Phase 4's `want` set is the authoritative list of it and is executed; nothing restates it. The framework's own `tests/` are **not** installed.
 - `.shl/CLAUDE.md` + `AGENTS.md` — the loop agent's operating doc, under both names harnesses auto-load.
 - `.shl/.gitignore`, `adapters/target.py` (must export an instance named `adapter`), `SETUP.md` the decision record, and `README.md` for whoever meets this directory without expecting it.
-- `.github/workflows/watch.yml` + `heal.yml`; repo vars, plus the provider key and — only on a hosted log source — a log credential.
+- `.github/workflows/watch.yml` + `heal.yml`; repo vars, plus the provider key and, only on a hosted log source, a log credential.
 
 Plus, **only when Phase 1 records them missing**, the prerequisites a loop cannot run without: a test suite and its runner, a client-error relay, sourcemap and build-identifier config. The **project's** own files; Phase 11 lists them separately.
 
@@ -57,7 +57,7 @@ Plus, **only when Phase 1 records them missing**, the prerequisites a loop canno
 
 Both are asked here because a wrong answer stays invisible until the bill arrives. The other two settle elsewhere: **correctness is machine-checkable** at decision 1, which stops a project that cannot be gated; **the agent tools work** is carried rather than vetoed, since Phase 9b runs no agent and only a real failure or the optional verification exercises them.
 
-**Can the bot act on this repo?** Two settings, both **blocking findings**. Both need a GitHub remote and a working `gh` — the two items below. If either of those is missing, this check is deferred with them rather than failing Phase 0: record it as unresolved and carry it into the Phases 7–10 pending list. Either one wrong and every cycle runs Diagnose, Red, Fix and the gate — spending agent calls — then dies at the PR or the merge. Forever, and loudly, so nothing bad merges; the loop simply never works.
+**Can the bot act on this repo?** Two settings, both **blocking findings**. Both need a GitHub remote and a working `gh` — the two items below. If either of those is missing, this check is deferred with them rather than failing Phase 0: record it as unresolved and carry it into the Phases 7–10 pending list. Either one wrong and every cycle runs Diagnose, Red, Fix and the gate, spending agent calls, then dies at the PR or the merge. Forever, and loudly, so nothing bad merges; the loop simply never works.
 
 Every `gh` call you make in this phase reads; say so, and say that the one write below is the operator's.
 
@@ -97,7 +97,7 @@ Read-only. Record each finding **with the file it came from**. Verify; never inf
 
 ## Phase 2 — The interview
 
-**Mode first.** A loop directory already present — `.shl/` or an older name — means this is an update: load [reference/updating.md](reference/updating.md) and run its detection before asking anything, since two of its four states are stops. Then read `SETUP.md`, confirm what changed, append; never re-ask a settled decision. Announce the mode in one line; do not ask which to use.
+**Mode first.** A loop directory already present (`.shl/` or an older name) means this is an update: load [reference/updating.md](reference/updating.md) and run its detection before asking anything, since two of its four states are stops. Then read `SETUP.md`, confirm what changed, append; never re-ask a settled decision. Announce the mode in one line; do not ask which to use.
 
 How to ask:
 
@@ -252,7 +252,7 @@ The operator reviews and merges. Record whether a fresh context audited that sui
 Only reachable now: until the merge, `workflow_dispatch` could not see either workflow.
 
 - [ ] **Dispatch the watch once** (`gh workflow run watch.yml --ref <the install branch>`). First time anything runs on a runner: checkout, the harness install, `SHL_SETUP_CMD`, the adapter import and `read_log` with its credential.
-- [ ] **Say what this can do before running it.** If `read_log` returns a readable failure, `watch.yml` dispatches `heal.yml` on that ref and a full cycle runs — three agent calls, the deploy command, and a merge into that branch — with no further approval. That is the loop working as designed, but the operator has not yet consented to unattended operation, so either dispatch on a window they confirm is clean or tell them plainly what may follow.
+- [ ] **Say what this can do before running it.** If `read_log` returns a readable failure, `watch.yml` dispatches `heal.yml` on that ref and a full cycle runs (three agent calls, the deploy command, and a merge into that branch) with no further approval. That is the loop working as designed, but the operator has not yet consented to unattended operation, so either dispatch on a window they confirm is clean or tell them plainly what may follow.
 
 State the ceiling in the report rather than implying more was proved: `loop.py watch` constructs no agent, so **an IDLE result proves nothing about whether the harness runs on a runner.** That is first answered by a real failure, or by the optional verification above.
 

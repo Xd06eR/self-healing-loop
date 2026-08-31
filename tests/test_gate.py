@@ -558,8 +558,8 @@ class AQuotedDiffHeaderStillNamesItsPath(unittest.TestCase):
         )
 
     def test_the_weakening_check_reads_the_same_decoded_path_the_others_do(self):
-        # `is_test_weakened` used to restate the header patterns instead of
-        # calling the shared parser, so it saw the raw escapes while every other
+        # `is_test_weakened` must call the shared parser rather than restate
+        # the header patterns. Restating it makes this check see the raw escapes while every other
         # check saw the decoded name. A directory-shaped glob — the form the
         # `--test-globs` flag exists for — then matched for one and not the
         # other, and the file went unpoliced.
@@ -765,7 +765,7 @@ class TheWorkflowDirectoryIsOffLimitsToo(unittest.TestCase):
 
 
 class ACrlfDiffStillNamesItsFiles(unittest.TestCase):
-    """`split("\\n")` leaves the `\\r` that `splitlines()` used to consume.
+    """`split("\\n")` leaves the `\\r` that `splitlines()` consumes.
 
     The newline-only splitter exists to stop a form feed forging a diff header.
     It also changed what a CRLF diff looks like to the parser: `_DIFF_HEADER_RE`

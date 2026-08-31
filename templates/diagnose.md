@@ -8,7 +8,7 @@ Fix and Review are given the issue you write, not the failure. Whatever you leav
 
 **What you receive is compacted, not the raw log.** Your prompt carries it under *Failure log (compacted)*: error lines with their traces, one slot per distinct failure, repeats collapsed to the most recent. Compaction can drop a failure the raw log held, so absence from your context is not evidence of absence in production. Diagnose what is in front of you; do not conclude anything from what is not.
 
-Where the signal carries a real root cause, state it as a specific claim about the code ("X does not handle Y"), never a restatement of the symptom ("X throws an error"). Where it does not — a bare message with no frames, a truncated trace, a failure in code the signal never names — **say that in `issue_body` and set `confidence: low`.** A plausible root cause invented from a thin signal becomes the specification two later agents work from, and neither can check it against the failure.
+Where the signal carries a real root cause, state it as a specific claim about the code ("X does not handle Y"), never a restatement of the symptom ("X throws an error"). Where it does not (a bare message with no frames, a truncated trace, a failure in code the signal never names), **say that in `issue_body` and set `confidence: low`.** A plausible root cause invented from a thin signal becomes the specification two later agents work from, and neither can check it against the failure.
 
 Read the source the signal implicates. Your working directory is the loop's own folder and the project is one level up, so reach for it there. If the signal does not point cleanly at a file, trace it before guessing.
 
@@ -16,7 +16,7 @@ If your context carries an incident-memory section, it appeared because a previo
 
 ## Reproducing the failure
 
-Most production runtime errors — a 500, a rate limit, a null from an upstream API, a timeout — do not reduce to a clean unit test, and that is expected. Reproduce when the failure genuinely maps to deterministic code behaviour. Forcing a brittle test onto a flaky or external failure buys nothing; saying you cannot reproduce it is information, not a failure of your task.
+Most production runtime errors (a 500, a rate limit, a null from an upstream API, a timeout) do not reduce to a clean unit test, and that is expected. Reproduce when the failure genuinely maps to deterministic code behaviour. Forcing a brittle test onto a flaky or external failure buys nothing; saying you cannot reproduce it is information, not a failure of your task.
 
 When you can, write the full test as runnable source in this project's own language and framework. Two hard constraints:
 

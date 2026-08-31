@@ -8,14 +8,14 @@ A framework that installs a fully autonomous self-healing CI/CD loop into a proj
 >
 > **Those runs predate the code in this tree**, and that qualifier is the important one. The gate, the guardrail CLI and the heal workflow were substantially rewritten afterwards. What the runs evidence is the design; they are not evidence about this implementation.
 >
-> **Never completed on a runner:** everything from the merge onward — merge, deploy, post-deploy verification, automatic rollback, the incident record — plus the gate actually refusing a bad fix, the attempt cap, the escalation path, and OpenCode as a harness. The first group is reachable only when the step before it succeeds, and no cycle has got that far.
+> **Never completed on a runner:** everything from the merge onward (merge, deploy, post-deploy verification, automatic rollback, the incident record), plus the gate actually refusing a bad fix, the attempt cap, the escalation path, and OpenCode as a harness. The first group is reachable only when the step before it succeeds, and no cycle has got that far.
 >
 > **So the evidence is unit tests, workflow linting, and two partial runs against older code.** No cycle has ever completed. Treat every claim below against that.
 
 > **Risks to accept before installing.** Properties of the design and of its maturity, not defects awaiting a fix.
 >
 > - **The consultation is enforced by a prompt, not by code.** The installer interviews you and writes nothing until you agree — but that is an instruction to an agent, and what actually decides is **your harness's permission mode**. Launched in a mode that auto-approves file writes, an installer can vendor the core, generate a test suite and stand up a public HTTP endpoint without asking once, while every document here says it asked. **Start it in a mode that prompts, and confirm that before you begin**: nothing in this repo can check it for you, and this is the one risk you control entirely from outside.
-> - **It writes product code into your repository.** A test suite that becomes the gate guarding your default branch, and — on the browser-only branch — a public error-reporting endpoint. Both are yours to read at the install PR. Neither is undone by removing the loop.
+> - **It writes product code into your repository.** A test suite that becomes the gate guarding your default branch, and, on the browser-only branch, a public error-reporting endpoint. Both are yours to read at the install PR. Neither is undone by removing the loop.
 > - **The gate is heuristic and line-based.** It is a backstop, not a proof. Several ways past it have been found and closed: forged diff headers via bytes git treats as content, a frozen test whose path carries a non-ASCII character, a `.gitattributes` that blinds every content check, and a `.git/config` that reaches a shell. None was the last of its kind — AST-diff is the named upgrade and is not built.
 > - **It is only as good as what your logs record, and every shortfall is silent.** A failure your code swallows, a message logged without a stack trace, minified frames with no sourcemaps, or a retention window shorter than the cron — each one leaves the loop idling, and idle looks exactly like healthy. Past a certain point, improving the loop means improving your own logging rather than this framework.
 > - **Very few projects have installed this.** The install path is its least exercised part, and edge cases are likely.
@@ -44,7 +44,7 @@ Everything the agent emits is scrubbed of secrets before it reaches GitHub. The 
 
 The framework ships unit tests for the harness/model config, the merge gate (frozen-test, no-weakening, config-untouched, regression set), the confidentiality filter, the log compactor, the GitHub-derived state backend, incident memory and the per-cycle evidence bundle, plus structural tests over the shipped workflows and the installer.
 
-What no unit test can cover is a cycle: the workflows have to run on a real runner against a real failure. The must-pass case — a deliberately bad fix that weakens a test must be BLOCKED — is exercised against the gate directly here, and end to end only by the optional operator procedure in [`reference/verifying-the-install.md`](reference/verifying-the-install.md).
+What no unit test can cover is a cycle: the workflows have to run on a real runner against a real failure. The must-pass case (a deliberately bad fix that weakens a test must be BLOCKED) is exercised against the gate directly here, and end to end only by the optional operator procedure in [`reference/verifying-the-install.md`](reference/verifying-the-install.md).
 
 **Which capabilities are demonstrated against a real project and which are still only reasoned about is the Status block at the top of this file.** Read it before trusting anything below.
 
@@ -61,7 +61,7 @@ Two different things, deliberately kept apart. Neither is part of a default inst
 
 ## What the gate polices
 
-Unevenly, and the gaps are silent. Which files count as tests is glob-driven, so it works anywhere `SHL_TEST_GLOBS` is set correctly. What is language-aware only for **Python and JS/TS** is everything downstream: the assertion pattern misses Go's `t.Error`/`t.Fatal`; the skip pattern misses `xit(`, RSpec's `pending`, Rust's `#[ignore]` and JUnit's `@Disabled`; and the test-config protection covers Python, JS, and the Ruby, Rust and JVM manifests, so a stack configuring its runner anywhere else — Go among them — can still edit that file to exclude the frozen test. Separately, failure fingerprinting parses Python and V8 traces, and incident recall, issue dedup and the attempt cap all die together when it extracts nothing.
+Unevenly, and the gaps are silent. Which files count as tests is glob-driven, so it works anywhere `SHL_TEST_GLOBS` is set correctly. What is language-aware only for **Python and JS/TS** is everything downstream: the assertion pattern misses Go's `t.Error`/`t.Fatal`; the skip pattern misses `xit(`, RSpec's `pending`, Rust's `#[ignore]` and JUnit's `@Disabled`; and the test-config protection covers Python, JS, and the Ruby, Rust and JVM manifests, so a stack configuring its runner anywhere else (Go among them) can still edit that file to exclude the frozen test. Separately, failure fingerprinting parses Python and V8 traces, and incident recall, issue dedup and the attempt cap all die together when it extracts nothing.
 
 Installing on another stack is not blocked. On one, treat the must-pass check in the optional verification as required: it is the only thing that confirms the gate blocks a weakened test there.
 

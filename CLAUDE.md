@@ -52,7 +52,7 @@ The gate refuses in this order, and the order is load-bearing — a violation of
 
 **Every gate verdict states its grounds.** A refusal names the check, the file and the evidence (`BLOCKED [no test weakened]: tests/x.py: assertion removed: assert f() == 1`); a pass names the checks it rested on. Without it an empty `gate.txt` means both "passed" and "blocked".
 
-**The loop performs its own git and GitHub operations** — commit, push, open a PR, merge, revert — and so does the installer, which lands its install on a branch and opens a PR. That autonomy is the product rather than an oversight. The agent does none of it: every GitHub write is a plain workflow step, running only after the gate and the review both pass.
+**The loop performs its own git and GitHub operations** (commit, push, open a PR, merge, revert), and so does the installer, which lands its install on a branch and opens a PR. That autonomy is the product rather than an oversight. The agent does none of it: every GitHub write is a plain workflow step, running only after the gate and the review both pass.
 
 **Auto-merge is unconditional.** `heal.yml` runs Merge, Deploy, Verify, Rollback and Record as sequential steps in one job, so a mode that stopped at the PR would remove post-deploy verification, auto-rollback and the incident record with it. A protected default branch with no bot bypass is therefore a Phase 0 blocking check: without one, every cycle spends three agent calls and dies at the merge. An operator who cannot accept unattended merges sets `SHL_DEPLOY_CMD` empty and keeps the loop off that service.
 
@@ -72,7 +72,7 @@ Contracts, what `None` costs per method, and how each harness proves its restric
 ## Hard rules
 
 1. **Uppercase means a person opens it first; lowercase means a machine loads it on demand.** `SKILL.md`, `README.md`, `CLAUDE.md` and `AGENTS.md` are spellings external convention fixes, so this project does not choose their case. `tests/test_file_naming.py` enforces the rule, including that a template renamed without its write-out target fails.
-2. **One home per fact.** Every claim lives in exactly one file, per the doc map, and everything else links to it. Two copies of a table drift, and the reader cannot tell which is current.
+2. **One home per fact.** Every claim has one owner, per the doc map, and everything else links to it rather than keeping a second copy to maintain. Deliberate restatement is allowed where the reader cannot reach the owner (`artifacts/` is written into a target, `reference/` loads one branch at a time), and it names the owner and says to change it there. What drifts is two copies that both read as authoritative.
 
 ## Out of scope, by design
 

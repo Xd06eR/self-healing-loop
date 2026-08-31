@@ -180,8 +180,8 @@ class ACorruptRowDoesNotTakeMemoryDownWithIt(unittest.TestCase):
         self.assertEqual(len(kept), 3)
 
     def test_a_cap_of_zero_empties_the_store_rather_than_keeping_it_whole(self):
-        # `reverted[-0:]` is the WHOLE list, so the exempt group used to absorb
-        # every record and the cap kept exactly what it was told to drop.
+        # `reverted[-0:]` is the WHOLE list, so a naive slice makes the exempt
+        # group absorb every record and the cap keep what it was told to drop.
         self._write(json.dumps(dict(self.GOOD, outcome="reverted")))
         record_incident(IncidentRecord(**dict(self.GOOD, issue_id="new")),
                         log_path=self.log_path, max_records=0)

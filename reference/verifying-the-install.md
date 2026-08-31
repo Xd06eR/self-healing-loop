@@ -40,9 +40,9 @@ A loop that only proves the happy path has not been verified. The gate is the si
 
 **One exception, and it is not a formality.** If this project is not Python or JS/TS, this section is **required** rather than optional: the gate's weakening detection is only partly language-aware, and nothing else confirms it holds on your stack.
 
-You cannot inject a fix into a cycle — the agent authors it — so run the gate against a weakened diff directly. Delete an assertion from any test file, then:
+You cannot inject a fix into a cycle, because the agent authors it, so run the gate against a weakened diff directly. Delete an assertion from any test file, then:
 
-**Pass this project's own conventions as flags.** `heal.yml` gives the gate `--test-globs`, `--test-config-globs`, `--assert-pattern` and `--skip-pattern` from the matching `SHL_*` variables on every cycle. **The CLI reads no environment at all** — those variables reach it only because the workflow turns them into flags — so a bare invocation here runs a *narrower* gate than the real one and reports a failure the real gate would not have. Omit any flag whose value is empty:
+**Pass this project's own conventions as flags.** `heal.yml` gives the gate `--test-globs`, `--test-config-globs`, `--assert-pattern` and `--skip-pattern` from the matching `SHL_*` variables on every cycle. **The CLI reads no environment at all**, and those variables reach it only because the workflow turns them into flags, so a bare invocation here runs a *narrower* gate than the real one and reports a failure the real gate would not have. Omit any flag whose value is empty:
 
 ```bash
 git add -A && git diff --cached --unified=0 > weakened.diff
