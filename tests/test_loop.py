@@ -516,8 +516,11 @@ class RunFixWithoutAnIssueNumber(unittest.TestCase):
 
 
 class TheAttemptCapDefaultIsBehavioural(unittest.TestCase):
-    """The README states the cap as the literal 2; the shipped default must be
-    that number, pinned by behaviour rather than by agreeing with a doc."""
+    """`artifacts/readme.md` states the cap as the literal 2, and `test_skill.py`
+    pins that number against `under_attempt_cap`'s signature. This closes the
+    other half of the chain: that calling it WITHOUT `cap=` actually escalates
+    at that count. A default agreeing with a doc it never exercises is the gap
+    both halves exist to shut."""
 
     def _runner(self, bodies):
         def runner(argv):
