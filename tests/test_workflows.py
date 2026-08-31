@@ -1188,7 +1188,7 @@ class EveryIdentityIsDerivedFromTheRawLog(unittest.TestCase):
     `loop.py` is proven to key correctly on whatever text it is given, so the
     only place this defect can now live is the argument. Compaction keeps error
     lines and their INDENTED continuation; a Go panic puts its trace behind a
-    blank line and indents none of it, so identifying from `signal.txt` hands a
+    blank line, which ends the collected block, so identifying from `signal.txt` hands a
     target's `failure_ids` a message with no frames. It returns `[]`, the cycle
     is refused as unfingerprintable, and the loop stalls on every tick — on
     exactly the runtimes the seam exists to serve.
@@ -1229,7 +1229,7 @@ class EveryIdentityIsDerivedFromTheRawLog(unittest.TestCase):
         # every consumer below reading a file that does not exist.
         for workflow in ("watch.yml", "heal.yml"):
             with self.subTest(workflow=workflow):
-                self.assertIn("loop.py watch signal.raw", self._runs(workflow))
+                self.assertIn('loop.py watch "$RUNNER_TEMP/signal.raw"', self._runs(workflow))
 
     def test_the_raw_log_survives_the_whole_watch_step(self):
         """Executed, because the argument spellings cannot answer this.
@@ -1279,12 +1279,15 @@ class EveryIdentityIsDerivedFromTheRawLog(unittest.TestCase):
             path.chmod(0o755)
             out = root / "gh_output"
             out.write_text("")
+            runner_temp = root / "runner_temp"
+            runner_temp.mkdir()
             proc = subprocess.run(
                 ["bash", "-e"], input=script, text=True, capture_output=True, cwd=root,
-                env={"PATH": f"{binaries}:/usr/bin:/bin", "GITHUB_OUTPUT": str(out)},
+                env={"PATH": f"{binaries}:/usr/bin:/bin", "GITHUB_OUTPUT": str(out),
+                     "RUNNER_TEMP": str(runner_temp)},
             )
             self.assertEqual(proc.returncode, 0, proc.stderr.strip())
-            raw = (root / "signal.raw").read_text()
+            raw = (runner_temp / "signal.raw").read_text()
             signal = (root / "signal.txt").read_text()
             verdict = out.read_text()
 
@@ -1296,8 +1299,8 @@ class EveryIdentityIsDerivedFromTheRawLog(unittest.TestCase):
 
     def test_diagnose_gets_both_and_fix_gets_the_raw_log(self):
         heal = self._runs("heal.yml")
-        self.assertIn("loop.py diagnose signal.txt signal.raw", heal)
-        self.assertRegex(heal, r"loop\.py fix \"\$\{\{[^}]*\}\}\" signal\.raw")
+        self.assertIn('loop.py diagnose signal.txt "$RUNNER_TEMP/signal.raw"', heal)
+        self.assertRegex(heal, r'loop\.py fix "\$\{\{[^}]*\}\}" "\$RUNNER_TEMP/signal\.raw"')
 
     def test_the_recorded_incident_is_keyed_from_the_raw_log(self):
         # The other half of the round trip. A record written from compacted text
@@ -1305,7 +1308,7 @@ class EveryIdentityIsDerivedFromTheRawLog(unittest.TestCase):
         # record exists to catch never matches it — and both halves look correct
         # read on their own.
         record = step_chunk("heal.yml", "Record incident")
-        self.assertIn("raw_log=open('.shl/signal.raw')", record)
+        self.assertIn("raw_log=open(os.environ['RUNNER_TEMP'] + '/signal.raw')", record)
         self.assertNotIn("signal.txt", record)
 
 
@@ -1354,7 +1357,16 @@ class TheReviewersReasonReachesAHumanOnEitherVerdict(unittest.TestCase):
             binaries = root / "bin"
             binaries.mkdir()
             for name, script in {
-                "jq": f'#!/bin/sh\nprintf "%s" "{reason}"\n',
+                # Emulates the one jq behaviour this step turns on: `-e` exits
+                # 1 when the result is null or empty. Without that the stub
+                # cannot tell `jq -er` from `jq -r '.reason // ""'`, and the
+                # test passes on the command that strands an approved fix.
+                "jq": (
+                    "#!/bin/sh\n"
+                    f'out="{reason}"\n'
+                    'printf "%s" "$out"\n'
+                    'case "$*" in *-e*) [ -n "$out" ] || exit 1;; esac\n'
+                ),
                 # Two shapes reach `python` in these steps: the scrubber,
                 # which names its input with `--text`, and a `-c` one-liner
                 # reading the attempt count. Branching on the flag rather than
@@ -1394,7 +1406,21 @@ class TheReviewersReasonReachesAHumanOnEitherVerdict(unittest.TestCase):
         # leaving every command in the step present and correctly ordered.
         proc, posted = self._run(self.STEP, reason="RAW SECRET FROM THE LOG")
         self.assertEqual(proc.returncode, 0, proc.stderr.strip())
-        self.assertEqual(posted, "SCRUBBED SECRET FROM THE LOG")
+        self.assertIn("SCRUBBED SECRET FROM THE LOG", posted)
+        # A reader has to be able to tell the paragraph below the line was
+        # written by a model whose context carried untrusted log text.
+        self.assertTrue(posted.startswith("Automated review verdict"), posted)
+
+    def test_an_empty_reason_does_not_strand_an_approved_fix(self):
+        # The silent one. This step runs between Review and Merge, so a
+        # non-zero exit here skips the merge, the deploy, the verification and
+        # the incident record — while the handler that would record a failed
+        # attempt is scoped to gate and suite outcomes and never fires. The
+        # cycle stalls and the cap never advances.
+        proc, posted = self._run(self.STEP, reason="")
+        self.assertEqual(proc.returncode, 0, proc.stderr.strip())
+        self.assertIsNone(posted, "an empty reason was posted as a comment")
+        self.assertIn("::warning::", proc.stdout)
 
     def test_a_failed_comment_does_not_block_the_merge(self):
         # Executed, not grepped: `::warning::` being present in the text says

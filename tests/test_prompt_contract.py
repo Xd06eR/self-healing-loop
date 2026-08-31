@@ -698,8 +698,16 @@ class NothingVendoredCitesALessonNumber(unittest.TestCase):
     VENDORED = (
         "*.py", "adapters/**/*.py", "agent/**/*.py", "guardrails/**/*.py",
         "templates/*.md", "loop_context/*.md",
+        # Both of these also land in a target: `artifacts/` is written into the
+        # repo root as SETUP.md / INSTALL-REPORT.md / README.md, and the
+        # workflows into .github/workflows/. A sweep that skips them reports a
+        # clean bill over two of the four things the operator actually opens.
+        "artifacts/*.md", "workflows/*.yml",
     )
-    CITATION = re.compile(r"\(L\d+\)")
+    # Not `\(L\d+\)`. Parentheses are how these citations were mostly written,
+    # not what makes them dangle — a bare `for the reason L9 records` resolves
+    # exactly as poorly and slipped straight through a sweep that demanded them.
+    CITATION = re.compile(r"\bL\d+\b")
 
     def test_no_vendored_file_cites_one(self):
         checked, offenders = 0, []

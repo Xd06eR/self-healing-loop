@@ -136,8 +136,9 @@ def run_watch(adapter, raw_out: Path | None = None) -> str:
     ``raw_out`` receives the log exactly as read. Everything that derives a
     failure IDENTITY reads that file rather than the signal, and the split is
     load-bearing: compaction keeps error lines plus their INDENTED
-    continuation, while a Go panic puts its trace behind a blank line and
-    indents none of it. Identifying from compacted text therefore hands
+    continuation, while a Go panic puts its trace behind a blank line — which
+    ends the block, so the frames after it are dropped however they are
+    indented. Identifying from compacted text therefore hands
     ``TargetAdapter.failure_ids`` a message with no frames, on precisely the
     runtimes that method exists to serve — it returns ``[]``, the cycle is
     refused as unfingerprintable, and the loop stalls on every tick forever.
@@ -230,12 +231,12 @@ def run_diagnose(agent, repo_path, log: str, raw_log: str) -> dict:
     )
 
 
-def run_fix(agent, repo_path, issue: str, repro: str, raw_log: str = "",
+def run_fix(agent, repo_path, issue: str, repro: str, raw_log: str,
             issue_number: str = "") -> dict:
     """``raw_log`` is the cycle's uncompacted log — the same key Diagnose recalled on.
 
     The frozen path is COMPUTED here from the issue number rather than accepted
-    as a parameter, for the reason L9 records: two drivers given the same rule
+    as a parameter, for the reason every seam here does: two drivers given one rule
     drift, and the one under test is not the one that ships. `templates/fix.md`
     and the loop-agent operating doc both promise Fix is told which file is
     frozen, and this is what keeps that promise true — without it Fix sees a red

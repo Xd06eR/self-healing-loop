@@ -249,5 +249,63 @@ class AnUnlabelledContextKeyIsAMistakeNotASilentDrop(unittest.TestCase):
         build_prompt(AgentRole.REVIEW, {"diff": "d", "issue": "i", "repro": "r"})
 
 
+class ARequiredTextFieldMustCarryText(unittest.TestCase):
+    """A present-but-empty field passes a key check and breaks the workflow.
+
+    `validate_contract` tested key PRESENCE only, so `{"approved": true,
+    "reason": null}` was a valid Review payload. Five workflow steps then read
+    these fields with `jq -er`, which exits 1 on a null — and `run:` bodies
+    execute under `bash -e`, so the step dies. On the approve path that lands
+    between Review and Merge: an approved, fully gated fix never merges, no
+    attempt is recorded because that handler is scoped to gate and suite
+    outcomes, and the cap therefore never advances. The same failure is
+    re-diagnosed every tick, three agent calls a cycle, forever.
+
+    Caught here rather than at each `jq`: this is the one place that already
+    knows what a role must return, and a rule five callers must each remember
+    is a rule they eventually forget.
+    """
+
+    VALID = {
+        AgentRole.DIAGNOSE: {
+            "issue_title": "t", "issue_body": "b",
+            "reproducible": False, "confidence": "low",
+        },
+        AgentRole.FIX: {"summary": "s", "files_changed": []},
+        AgentRole.REVIEW: {"approved": True, "reason": "r"},
+    }
+    TEXT = {
+        AgentRole.DIAGNOSE: ("issue_title", "issue_body", "confidence"),
+        AgentRole.FIX: ("summary",),
+        AgentRole.REVIEW: ("reason",),
+    }
+
+    def test_a_valid_payload_still_passes(self):
+        for role, payload in self.VALID.items():
+            with self.subTest(role=role.value):
+                validate_contract(role, payload)
+
+    def test_null_and_empty_are_both_refused(self):
+        checked = 0
+        for role, fields in self.TEXT.items():
+            for field in fields:
+                for bad in (None, "", "   "):
+                    checked += 1
+                    with self.subTest(role=role.value, field=field, value=repr(bad)):
+                        payload = dict(self.VALID[role], **{field: bad})
+                        with self.assertRaises(ValueError) as caught:
+                            validate_contract(role, payload)
+                        self.assertIn(field, str(caught.exception))
+        # A renamed field would otherwise empty the loop above and report a
+        # clean pass over nothing.
+        self.assertEqual(checked, 15)
+
+    def test_a_non_string_is_refused_too(self):
+        # `jq -er` on a number succeeds and writes `7` into a PR comment; on an
+        # object it writes JSON. Neither is the paragraph the field promises.
+        with self.assertRaises(ValueError):
+            validate_contract(AgentRole.REVIEW, {"approved": True, "reason": 7})
+
+
 if __name__ == "__main__":
     unittest.main()

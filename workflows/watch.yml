@@ -118,7 +118,12 @@ jobs:
           # reference/closing-gaps.md, "The credential trap".
           SHL_LOG_TOKEN: ${{ secrets.SHL_LOG_TOKEN }}
         run: |
-          signal="$(python -B loop.py watch signal.raw)"
+          # RUNNER_TEMP, not the loop directory. This file is the target's
+          # log verbatim and unbounded — the compacted signal is what the
+          # prompt gets — and `.shl/` is the working directory the Fix
+          # agent stands in and may read. Outside the checkout it is also
+          # outside every `git add`, so no cycle can commit it.
+          signal="$(python -B loop.py watch "$RUNNER_TEMP/signal.raw")"
           if [ "$signal" = "IDLE" ]; then
             echo "signal=false" >> "$GITHUB_OUTPUT"
             echo "idle — nothing to heal"
@@ -132,7 +137,7 @@ jobs:
             #
             # And before the output is written, so the refusal is what stops the
             # dispatch rather than GitHub's implicit success() on the step.
-            python -B loop.py fingerprint-marker signal.raw > /dev/null
+            python -B loop.py fingerprint-marker "$RUNNER_TEMP/signal.raw" > /dev/null
             echo "signal=true" >> "$GITHUB_OUTPUT"
           fi
       - name: Dispatch heal

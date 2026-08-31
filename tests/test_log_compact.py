@@ -269,7 +269,7 @@ class ATargetSuppliedIdentityMakesAnyStackFingerprintable(unittest.TestCase):
 
     The seam is the whole identity, not just frame parsing, because extraction
     is format-specific too: a Go panic separates its trace from its message with
-    a blank line and indents none of it, so the built-in line filter keeps the
+    a blank line, which ends the collected block, so the built-in line filter keeps the
     panic line alone and no frame is ever reached. Holding that knowledge in
     core code fixes the supported set at release time, and every stack outside
     it produces no identity — which is what issue dedup, incident recall and the

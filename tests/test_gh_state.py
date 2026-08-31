@@ -6,6 +6,7 @@ from pathlib import Path
 README_TEMPLATE = Path(__file__).resolve().parents[1] / "artifacts" / "readme.md"
 
 from gh_state import (
+    MAX_MARKER_FINGERPRINTS,
     _marked_fingerprints,
     count_attempts,
     find_open_issue,
@@ -263,6 +264,43 @@ class AgentWrittenProseCannotHijackTheDedupKey(unittest.TestCase):
         self.assertEqual(
             _marked_fingerprints("<!-- shl-fingerprint: A@x:1,B@y:2 -->"),
             {"A@x:1", "B@y:2"},
+        )
+
+
+class TheMarkerIsBoundedSoTheIssueCanBeFiled(unittest.TestCase):
+    """An unbounded marker eventually makes every cycle fail at `gh issue create`.
+
+    Identities come from the RAW log, which carries every distinct failure the
+    target produced rather than the handful compaction keeps for the prompt. A
+    noisy target therefore grows this marker without limit, and GitHub caps an
+    issue body at 65,536 characters — so past a few thousand failures the loop
+    stops being able to file at all, on every tick, with nothing in the repo
+    having changed.
+    """
+
+    def test_a_huge_failure_set_produces_a_bounded_marker(self):
+        many = [f"Err{n}@app/mod{n}.py:{n}" for n in range(2000)]
+        decoded = _marked_fingerprints(fingerprint_marker(many))
+        self.assertEqual(len(decoded), MAX_MARKER_FINGERPRINTS)
+
+    def test_the_body_stays_far_inside_githubs_limit(self):
+        many = [f"SomeLongExceptionName{n}@some/deep/path/module{n}.py:{n}" for n in range(2000)]
+        self.assertLess(len(fingerprint_marker(many)), 8000)
+
+    def test_the_same_failure_set_always_yields_the_same_subset(self):
+        # Sorted before slicing. An arbitrary subset would make two cycles on
+        # an identical log disagree, which is a duplicate issue and a reset cap.
+        many = [f"Err{n}@app/mod{n}.py:{n}" for n in range(2000)]
+        self.assertEqual(fingerprint_marker(many), fingerprint_marker(list(reversed(many))))
+
+    def test_a_later_cycle_still_recognises_the_same_failure(self):
+        # The property the cap must not break: dedup is set intersection, so a
+        # window that shifts by one new failure still matches.
+        first = [f"Err{n}@app/mod{n}.py:{n}" for n in range(2000)]
+        later = ["Aaa@app/new.py:1"] + first
+        self.assertTrue(
+            _marked_fingerprints(fingerprint_marker(first))
+            & _marked_fingerprints(fingerprint_marker(later))
         )
 
 

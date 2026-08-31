@@ -31,6 +31,15 @@ _CONTRACT = {
     AgentRole.REVIEW: {"approved", "reason"},
 }
 
+# The subset of the above that a workflow step reads as TEXT and writes into a
+# GitHub issue, a PR body or a PR comment. `files_changed` and the two booleans
+# are absent because each is consumed as its own shape and guarded separately.
+_TEXT_FIELDS = {
+    AgentRole.DIAGNOSE: ("issue_title", "issue_body", "confidence"),
+    AgentRole.FIX: ("summary",),
+    AgentRole.REVIEW: ("reason",),
+}
+
 
 def _load_template(role: AgentRole) -> str:
     return (_TEMPLATE_DIR / f"{role.value}.md").read_text(encoding="utf-8")
@@ -63,6 +72,20 @@ def build_prompt(role: AgentRole, context: dict) -> str:
 
 def validate_contract(role: AgentRole, payload: dict) -> None:
     missing = set(_CONTRACT[role]) - payload.keys()
+    # Present is not the same as populated, and the difference is a stalled
+    # cycle. Five workflow steps read these fields with `jq -er`, which exits 1
+    # on a JSON null, and a `run:` body executes under `bash -e` — so a null
+    # kills the step. On the approve path that lands between Review and Merge:
+    # an approved, fully gated fix never merges, and the handler that records a
+    # failed attempt is scoped to gate and suite outcomes, so nothing counts it
+    # and the cap never advances. Checked here because this is the one place
+    # that already knows what a role must return; a rule five callers must each
+    # remember is one they eventually forget.
+    for field in _TEXT_FIELDS[role]:
+        value = payload.get(field)
+        if field in payload and not (isinstance(value, str) and value.strip()):
+            missing.discard(field)
+            missing.add(f"{field}{{text}}")
     # A Diagnose that claims reproducible MUST ship runnable reproducing test
     # CODE. The workflow composes the path itself, writes that code, proves it
     # red, and freezes

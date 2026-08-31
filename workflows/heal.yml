@@ -188,7 +188,7 @@ jobs:
         env:
           SHL_LOG_TOKEN: ${{ secrets.SHL_LOG_TOKEN }}
         run: |
-          signal="$(python -B loop.py watch signal.raw)"
+          signal="$(python -B loop.py watch "$RUNNER_TEMP/signal.raw")"
           if [ "$signal" = "IDLE" ]; then echo "go=false" >> "$GITHUB_OUTPUT"; exit 0; fi
           printf '%s' "$signal" > signal.txt
           echo "go=true" >> "$GITHUB_OUTPUT"
@@ -227,7 +227,7 @@ jobs:
         working-directory: .shl
         env:
           SHL_AUTH_TOKEN: ${{ secrets.SHL_AUTH_TOKEN }}
-        run: python -B loop.py diagnose signal.txt signal.raw > diagnose.json
+        run: python -B loop.py diagnose signal.txt "$RUNNER_TEMP/signal.raw" > diagnose.json
 
       # Dedupe issue FIRST (before the red check), so a persistently-bad repro
       # spec reuses one issue instead of spamming a new one every cycle.
@@ -247,7 +247,7 @@ jobs:
           # to zero so the attempt cap can never fire. Incident memory keys on
           # the same fingerprints through the same code path, for the same
           # reason.
-          existing="$(PYTHONPATH=.shl python -B .shl/loop.py find-issue .shl/signal.raw)"
+          existing="$(PYTHONPATH=.shl python -B .shl/loop.py find-issue "$RUNNER_TEMP/signal.raw")"
           if [ -n "$existing" ]; then
             echo "number=$existing" >> "$GITHUB_OUTPUT"
             gh issue comment "$existing" --body "🤖 re-detected"
@@ -256,7 +256,7 @@ jobs:
             PYTHONPATH=.shl python -B -m guardrails.cli scrub --text .shl/body.raw > .shl/body.txt
             # The marker is what the next cycle recognises. It is an HTML
             # comment, so it is invisible in the rendered issue.
-            PYTHONPATH=.shl python -B .shl/loop.py fingerprint-marker .shl/signal.raw >> .shl/body.txt
+            PYTHONPATH=.shl python -B .shl/loop.py fingerprint-marker "$RUNNER_TEMP/signal.raw" >> .shl/body.txt
             url="$(gh issue create --title "$title" --body-file .shl/body.txt)"
             echo "number=${url##*/}" >> "$GITHUB_OUTPUT"
           fi
@@ -377,7 +377,7 @@ jobs:
           SHL_AUTH_TOKEN: ${{ secrets.SHL_AUTH_TOKEN }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          python -B loop.py fix "${{ steps.issue.outputs.number }}" signal.raw > fix.json
+          python -B loop.py fix "${{ steps.issue.outputs.number }}" "$RUNNER_TEMP/signal.raw" > fix.json
           if jq -e '.escalate' fix.json >/dev/null; then
             gh issue comment "${{ steps.issue.outputs.number }}" --body "🤖 escalated to human: attempt cap reached"
             echo "escalated=true" >> "$GITHUB_OUTPUT"
@@ -611,15 +611,32 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          jq -er .reason .shl/review.json > .shl/reason.raw
-          # Scrubbed before it is posted, never after: Review quotes the diff
-          # and the issue body back at itself, and both derive from a log this
-          # loop does not trust.
-          PYTHONPATH=.shl python -B -m guardrails.cli scrub --text .shl/reason.raw > .shl/reason.txt
-          # Warn rather than fail. The fix passed both gates, so refusing to
-          # ship it because GitHub rejected a comment trades a real merge for a
-          # cosmetic one — the same call the incident-log push makes below.
-          gh pr comment "$(cat .shl/pr_url.txt)" --body-file .shl/reason.txt || echo "::warning::review verdict comment failed; the reason is still in the evidence bundle"
+          # `// ""` rather than `-e`, and the difference decides a cycle. `jq -e`
+          # exits 1 on a JSON null, `run:` executes under `bash -e`, and this
+          # step sits between Review and Merge — so a null reason would strand
+          # an approved, fully gated fix, and the handler that records a failed
+          # attempt is scoped to gate and suite outcomes, so nothing would count
+          # it. `role.validate_contract` refuses a null upstream; this is the
+          # second line, because everything this step can get wrong is silent.
+          jq -r '.reason // ""' .shl/review.json > .shl/reason.raw
+          if [ -s .shl/reason.raw ]; then
+            # Scrubbed before it is posted, never after: Review quotes the diff
+            # and the issue body back at itself, and both derive from a log this
+            # loop does not trust.
+            PYTHONPATH=.shl python -B -m guardrails.cli scrub --text .shl/reason.raw > .shl/reason.txt
+            # Warn rather than fail. The fix passed both gates, so refusing to
+            # ship it because GitHub rejected a comment trades a real merge for
+            # a cosmetic one — the same call the incident-log push makes below.
+            # One line the model did not write. This posts as
+            # github-actions[bot], which reads as more trustworthy than an
+            # anonymous comment, on a PR that merges seconds later — and
+            # the paragraph under it came from an agent whose context
+            # carried attacker-influencable log text. Naming that is free.
+            { echo "Automated review verdict (model-authored, unverified):"; echo; cat .shl/reason.txt; } > .shl/comment.txt
+            gh pr comment "$(cat .shl/pr_url.txt)" --body-file .shl/comment.txt || echo "::warning::review verdict comment failed; the reason is still in the evidence bundle"
+          else
+            echo "::warning::review approved with no reason to publish"
+          fi
 
       # 8. Merge synchronously (--auto would race Deploy).
       - name: Merge
@@ -888,7 +905,7 @@ jobs:
           record_cycle(issue_id='${{ steps.issue.outputs.number }}', \
           signature=d['issue_title'], root_cause=d.get('issue_body',''), \
           fix_commit='$(git rev-parse HEAD)', outcome='$outcome', \
-          raw_log=open('.shl/signal.raw').read(), repo_root=os.getcwd())"
+          raw_log=open(os.environ['RUNNER_TEMP'] + '/signal.raw').read(), repo_root=os.getcwd())"
           git add .shl/incident_memory/log.jsonl
           git commit -m "record incident #${{ steps.issue.outputs.number }} ($outcome)" || true
           git push || echo "::warning::incident log push failed (branch protection?); memory not persisted this cycle"

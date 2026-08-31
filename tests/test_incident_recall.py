@@ -330,7 +330,7 @@ class ReachesTheAgent(unittest.TestCase):
 
     def test_no_signal_means_no_recall_rather_than_a_crash(self):
         context = self._payload_for(
-            lambda: self.loop.run_fix(object(), Path("/repo"), "issue", "repro")
+            lambda: self.loop.run_fix(object(), Path("/repo"), "issue", "repro", raw_log="")
         )
         self.assertEqual(context["incident_memory"], "")
 
@@ -530,10 +530,10 @@ class TheIdentityIsDerivedFromTheRawLog(unittest.TestCase):
     """Drive the commands `watch.yml` runs, in the order it runs them.
 
     Every other test in this file hands the identity path a raw panic directly.
-    The workflow does not: it runs `loop.py watch`, which compacts, and the
-    marker sees only what compaction kept. Compaction keeps error lines and
+    The workflow does not: it runs `loop.py watch`, which compacts. Were the
+    marker given that output, it would see only what compaction kept. Compaction keeps error lines and
     their INDENTED continuation, and a Go panic puts its trace behind a blank
-    line and indents none of it — so the frames the adapter keys on are gone
+    line, which ends the collected block — so the frames the adapter keys on are gone
     before the marker runs. It returns `[]`, `unfingerprintable` reports the
     failure unreadable, and the cycle is refused. Every tick, forever, on the
     runtimes this seam exists to serve.

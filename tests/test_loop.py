@@ -356,7 +356,7 @@ class FixIsToldAboutTheFrozenTestOnlyWhenOneExists(unittest.TestCase):
         with mock.patch.object(loop, "run_role", fake_run_role), \
              mock.patch.object(loop, "recall_incidents", lambda *a, **k: ""), \
              mock.patch.dict(os.environ, {"SHL_REPRO_PATH": "tests/issue-{}.test.ts"}):
-            loop.run_fix(object(), Path("/repo"), "issue", repro, issue_number="12")
+            loop.run_fix(object(), Path("/repo"), "issue", repro, raw_log="", issue_number="12")
         return captured.get("frozen", "")
 
     def test_a_reproducible_cycle_names_the_frozen_path(self):
@@ -419,7 +419,7 @@ class AnAbsentReproIsNotRenderedAsAnEmptyOne(unittest.TestCase):
     def _fix_prompt(self, repro: str) -> str:
         return self._prompt(
             lambda agent: loop.run_fix(
-                agent, Path("/repo"), "issue", repro, issue_number="12"
+                agent, Path("/repo"), "issue", repro, raw_log="", issue_number="12"
             ),
             repro,
         )
@@ -745,6 +745,7 @@ class TheReproThePromptsSeeIsTheOneTheWorkflowActedOn(unittest.TestCase):
                 Stub(), ".",
                 issue=json.dumps({"reproducible": False}),
                 repro=loop.frozen_repro({"reproducible": False, "repro_test": self.POPULATED}),
+                raw_log="",
                 issue_number=41,
             )
         # The HEADING, not the phrase. `fix.md` explains what a frozen test is

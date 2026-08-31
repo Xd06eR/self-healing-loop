@@ -87,7 +87,7 @@ class TestEndToEndWiring(unittest.TestCase):
         self.assertTrue(diag["reproducible"])
 
         # Fix: gets the issue, returns a valid fix.
-        fix = run_fix(self.agent, self.repo, issue=diag["issue_body"], repro="")
+        fix = run_fix(self.agent, self.repo, issue=diag["issue_body"], repro="", raw_log=signal)
         self.assertIn("app.py", fix["files_changed"])
 
         # Review: judges a diff, approves.

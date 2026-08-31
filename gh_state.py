@@ -37,6 +37,16 @@ _ATTEMPT_RE = re.compile(r"fix attempt\s+(\d+)", re.IGNORECASE)
 # the same fingerprints, for the same reason.
 _MARKER_RE = re.compile(r"<!-- shl-fingerprint: (.*?) -->")
 
+# The marker is embedded in an issue BODY, and GitHub caps that at 65,536
+# characters. Identities are derived from the raw log, which carries as many
+# distinct failures as the target produced rather than the handful compaction
+# keeps for the prompt — so on a noisy target an uncapped marker eventually
+# makes `gh issue create` fail, on every tick, with nothing else changing.
+# Sorted before slicing, so the same failure set always yields the same subset;
+# dedup is set INTERSECTION, so two cycles agreeing on any one identity still
+# match and a shifted window costs nothing.
+MAX_MARKER_FINGERPRINTS = 50
+
 
 def fingerprint_marker(fingerprints) -> str:
     """The line embedded in an issue body so a later cycle can recognise it.
@@ -50,7 +60,7 @@ def fingerprint_marker(fingerprints) -> str:
     escaping. Empty keeps the bare shape: the workflow greps it when refusing
     an unfingerprintable log.
     """
-    fps = sorted(set(fingerprints))
+    fps = sorted(set(fingerprints))[:MAX_MARKER_FINGERPRINTS]
     token = (
         base64.urlsafe_b64encode(json.dumps(fps, separators=(",", ":")).encode())
         .decode()
