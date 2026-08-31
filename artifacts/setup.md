@@ -36,6 +36,16 @@ Options were: a log on disk · the host's logs · CI only · nowhere readable ye
 
 This is the decision most worth re-reading. Getting it wrong does not break anything visibly: the loop reads the wrong place, finds nothing, and idles, which is indistinguishable from a healthy project.
 
+**And the loop is never better than what that surface records.** Every link below fails quietly, so each one presents as a quiet project rather than a broken loop:
+
+- An exception this project catches and answers `200` to writes nothing, so it does not exist to the loop at all.
+- Compaction keeps only lines carrying error vocabulary and a trace. A failure logged as a plain sentence is discarded before any agent reads it.
+- Failure identity comes from stack frames. A message with no trace yields no `Type@path:line`, and issue dedup, incident recall and the attempt cap all key on that identity and stop together — see `failure_ids()` under *Notes that bite if ignored*.
+- Minified frames have to be resolved through sourcemaps inside `read_log`. A build-hashed chunk name changes every deploy, so one recurring bug is fingerprinted as a new one each time and the loop never recognises a repeat.
+- Retention shorter than the cron loses failures unseen, which decision 4 below sets.
+
+Past a certain point, widening what this loop can heal means improving this project's own logging rather than changing anything under `.shl/`.
+
 ### 3. Browser-only failures: how do we make them visible?
 
 **Choice:** `{{BROWSER_FIX}}`
@@ -283,7 +293,7 @@ gh workflow run watch.yml --ref self-healing-loop-install
 
   **Pass the flags, not just the variables.** `heal.yml` converts the `SHL_*` values into exactly these flags on every cycle; the CLI itself reads no environment, so a bare invocation runs a narrower gate than the real one. Omit any flag whose value is empty.
 
-  It must exit non-zero and name the file and the assertion it lost. Restore the assertion afterwards. A zero exit means one of two things, and the pass line says which: `0 test file(s) matched the test globs` is the glob failing to recognise the file, while a non-zero count with a pass is the assertion form going unrecognised. Correct the value **and re-run with the flag** — setting the repo variable alone changes nothing about this command. Until this blocks, nothing has confirmed the check can read this project's tests at all.
+  It must exit non-zero and name the file and the assertion it lost. Restore the assertion afterwards. A zero exit means one of two things, and the pass line says which: `0 test file(s) matched the test globs` is the glob failing to recognise the file, while a non-zero count with a pass is the assertion form going unrecognised. Correct the value **and re-run with the flag** — setting the repo variable alone changes nothing about this command. Until this blocks, nothing has confirmed the gate can read this project's tests at all.
 - [ ] Remove the seeded defect and its test before the branch merges.
 
 ## Evolution log

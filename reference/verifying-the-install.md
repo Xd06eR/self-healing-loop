@@ -54,7 +54,7 @@ PYTHONPATH=.shl python3 -B -m guardrails.cli gate --diff weakened.diff \
 
 If it exits 0, stop and do not enable the cron. The pass line says which of the two things went wrong:
 
-- `0 test file(s) matched the test globs` — the check never recognised that file as a test. Either you omitted `--test-globs` above, or the value in `SHL_TEST_GLOBS` does not match this project's convention.
+- `0 test file(s) matched the test globs` — the gate never recognised that file as a test. Either you omitted `--test-globs` above, or the value in `SHL_TEST_GLOBS` does not match this project's convention.
 - A non-zero count, and still a pass — the file was recognised and the removed assertion was not. Your runtime's assertion form is not in the built-ins, so `--assert-pattern` (and `SHL_ASSERT_PATTERN`) has to name it.
 
 **Setting the repo variable alone does not change this command.** Fix the value, then re-run with the flag.

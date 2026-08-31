@@ -36,7 +36,7 @@ Because it found a real failure in {{LOG_SURFACE}}. Before any PR opens, the cha
 - **where the failure reduced to a test** — a reproducing test that failed on the broken code and passes on the fix. Many runtime failures do not reduce to one; on those cycles there is no such test, the gate says so in its output, and the remaining checks are what the PR rests on;
 - no test weakened, no assertion removed, no skip marker added;
 - no test-runner config edited — and **where the reproducing test sits in a dedicated test directory**, nothing already beside it changed either. On layouts that keep tests next to source that second half cannot apply, and the gate's output names which way it went;
-- nothing touched under `.shl/`, under `.github/workflows/`, or in any `.gitattributes` — so a fix cannot rewrite the check that judges it, delete the step that runs it, or blind it by changing how git renders diffs;
+- nothing touched under `.shl/`, under `.github/workflows/`, or in any `.gitattributes` — so a fix cannot rewrite the gate that judges it, delete the step that runs it, or blind it by changing how git renders diffs;
 - no test that was passing now failing, compared as a set where this project can list its failing tests and as a fully green suite where it cannot.
 
 A second agent reads the diff against the issue **after** the PR is open, and that verdict is what decides the merge. So an open PR is not by itself an endorsed one: when the reviewer blocks, it says why in a comment on the PR and stops there, leaving it open and unmerged.
