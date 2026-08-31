@@ -1,5 +1,7 @@
 # Updating an installed loop
 
+> Read this when Phase 2 finds a loop already installed. Phase 4 also loads it on a fresh install, for the manifest generator alone — nothing else here applies to one. Loaded by the installer; never vendored into the target.
+
 The target holds a **copy** of the core, so a framework fix does nothing there until the copy is refreshed, and a cycle run against a stale copy reports a confident wrong result. This branch refreshes it.
 
 One rule governs everything below:

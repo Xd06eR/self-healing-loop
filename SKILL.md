@@ -27,7 +27,7 @@ Load a reference file only on the branch you are on. None of them is vendored; t
 - [reference/harnesses.md](reference/harnesses.md) — at decision 10: the two harnesses, their credential paths, model-id formats and traps.
 - [reference/platforms.md](reference/platforms.md) — when the target deploys somewhere: log-surface families, retention against cadence, detection limits, and the recipe to fill per platform.
 - [reference/closing-gaps.md](reference/closing-gaps.md) — when Phase 1 records a gap: generating a test suite or a log surface, with the hardening rules.
-- [reference/updating.md](reference/updating.md) — when Phase 2 finds a loop already installed: what may be overwritten, what never may, and how to migrate an older install.
+- [reference/updating.md](reference/updating.md) — when Phase 2 finds a loop already installed: what may be overwritten, what never may, and how to migrate an older install. Phase 4 loads it on a fresh install too, for the manifest generator alone.
 - [reference/verifying-the-install.md](reference/verifying-the-install.md) — **only if the operator asks** how to prove the loop heals. It seeds a deliberate defect, so it is theirs to run and never yours.
 
 ## What gets installed
