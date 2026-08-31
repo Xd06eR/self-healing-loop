@@ -152,7 +152,7 @@ jobs:
       # the adapter's own credential for a hosted log source (Vercel, CloudWatch,
       # Sentry); without it a host-log read_log returns nothing and the loop
       # idles forever looking healthy. An adapter that reads a host log must not
-      # also run the suite here — see reference/closing-gaps.md.
+      # also run the suite here.
       - name: Re-read log
         id: w
         working-directory: .shl

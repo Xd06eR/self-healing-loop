@@ -92,8 +92,7 @@ jobs:
           #
           # The log-source credential below is a different thing: it belongs to
           # the adapter's own code, not to any agent. An adapter that reads a
-          # HOST log must not also run the suite in the same read_log — see
-          # reference/closing-gaps.md, "The credential trap".
+          # HOST log must not also run the suite in the same read_log.
           SHL_LOG_TOKEN: ${{ secrets.SHL_LOG_TOKEN }}
         run: |
           # RUNNER_TEMP, not the loop directory. This file is the target's

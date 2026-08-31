@@ -72,7 +72,7 @@ Contracts, what `None` costs per method, and how each harness proves its restric
 ## Hard rules
 
 1. **Uppercase means a person opens it first; lowercase means a machine loads it on demand.** `SKILL.md`, `README.md`, `CLAUDE.md` and `AGENTS.md` are spellings external convention fixes, so this project does not choose their case. `tests/test_file_naming.py` enforces the rule, including that a template renamed without its write-out target fails.
-2. **One home per fact.** Every claim has one owner, per the doc map, and everything else links to it rather than keeping a second copy to maintain. Deliberate restatement is allowed where the reader cannot reach the owner (`artifacts/` is written into a target, `reference/` loads one branch at a time), and it names the owner and says to change it there. What drifts is two copies that both read as authoritative.
+2. **One home per fact.** Every claim has one owner, per the doc map, and everything else links to it rather than keeping a second copy to maintain. Deliberate restatement is allowed where the reader cannot reach the owner (`artifacts/` is written into a target, `reference/` loads one branch at a time), and it names the owner and says to change it there. Vendored code names its owner rather than linking it, because the same relative path resolves to a different file once copied: `../CLAUDE.md` is this guide here and the loop agent's operating doc under a target's `.shl/`. What drifts is two copies that both read as authoritative.
 
 ## Out of scope, by design
 

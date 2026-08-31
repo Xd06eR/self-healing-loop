@@ -688,8 +688,9 @@ class NothingVendoredCitesALessonNumber(unittest.TestCase):
     nothing at all. Every site that carries one states the rule in the
     surrounding sentence regardless, which is what makes the number pure dangle.
 
-    Mechanical because the recurrence is: `gate.py` diagnoses this exact hazard
-    in its own header and then carried a bare `(L9)` a hundred lines below it.
+    Mechanical because whoever writes a citation cannot see it dangle: the
+    number reads as a reference to its author, and only a check that tries to
+    resolve it can tell that nothing is on the other end.
     """
 
     # What the install copies into `.shl/`. Kept as globs rather than the

@@ -386,10 +386,12 @@ OPENCODE = HarnessConfig(
         AgentRole.REVIEW: ("opencode", "debug", "agent", "shl-review"),
     },
     # Model rides in --model argv and must name the provider PLAN, not just the
-    # vendor; `reference/harnesses.md` carries the forms. A model id pointing at
-    # an endpoint the credential does not cover retries rather than erroring, so
-    # the symptom is a hung cycle. Auth uses the provider's native env var, named
-    # by the operator via ModelConfig.auth_env — no fixed default.
+    # vendor: `zai-coding-plan/glm-5.2` on the international plan,
+    # `zhipuai-coding-plan/glm-5.2` on the China one, never `zhipuai/glm-5.2`. A
+    # model id pointing at an endpoint the credential does not cover retries
+    # rather than erroring, so the symptom is a hung cycle. Auth uses the
+    # provider's native env var, named by the operator via ModelConfig.auth_env,
+    # with no fixed default.
     model_env=(),
     auth_env="",
     base_url_env="",
