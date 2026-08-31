@@ -24,9 +24,9 @@ A framework that installs a fully autonomous self-healing CI/CD loop into a proj
 
 ## The problem
 
-Projects produce failures that someone has to triage and fix by hand. This framework makes that loop autonomous and safe: an agent reads the failure signal on a schedule, reproduces the bug with a test, fixes the root cause, and ships the fix through a normal PR pipeline — guarded so it cannot game its way to green or leak secrets.
+Projects produce failures that someone has to triage and fix by hand. This framework makes that loop autonomous, and guards it so the agent doing the work cannot game its way to green or leak secrets.
 
-Where that signal comes from is the target's own answer, settled at install: a log the project writes, a log the host keeps, an error tracker, or simply the test suite going red. The last of those needs no deployment at all, so a library works as well as a service.
+Where the failure signal comes from is the target's own answer, settled at install: a log the project writes, a log the host keeps, an error tracker, or simply the test suite going red. The last of those needs no deployment at all, so a library works as well as a service.
 
 ## How it works
 
