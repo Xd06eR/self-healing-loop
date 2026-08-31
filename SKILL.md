@@ -17,7 +17,7 @@ Installs the loop into the repo this skill runs in. After install, a GitHub Acti
 
 > A fact may be **determined** only if getting it wrong would be **visible**. If a wrong answer is indistinguishable from a correct one, it is **asked**, however strong the evidence looks.
 
-**Never spend a question on something the repo answers.** A question the filesystem could have answered trains the operator to stop reading the ones that matter. Never ask about vendoring, the manifest check, the gitignore rules, copying the workflows, the adapter's TDD cycle, secret discipline, or the frozen-test and no-weakening rules. Those are mechanical and they are yours.
+**Never spend a question on something the repo answers.** A question the filesystem could have answered trains the operator to stop reading the ones that matter. The mechanical half of the install — vendoring, the manifest, the gitignore, the workflows, the gate's own rules — is yours to do, never to ask about.
 
 **Reliability over speed.** Several rounds is the expected shape, not a failure.
 
@@ -50,10 +50,12 @@ Plus, **only when Phase 1 records them missing**, the prerequisites a loop canno
 - [ ] `git rev-parse --show-toplevel` succeeds.
 - [ ] `git status --porcelain` is empty, so the diff reads as "what this skill added".
 
-**The four-condition veto.** All four must hold; any miss is a stop, not a warning. Two the operator answers here — a wrong answer to either is invisible until the bill arrives. The other two are not settled here: verification-can-be-automated stops at decision 1; working agent tools is carried, not vetoed — Phase 9b runs no agent; a real failure or optional verification answers it.
+**The four-condition veto.** All four must hold; any miss is a stop, not a warning.
 
 - [ ] **Ask:** do these failures repeat often enough to be worth automating?
 - [ ] **Ask:** can the token budget take a cycle per failure? A cycle is three agent calls, and a failure that recurs before it is fixed costs that again.
+
+Both are asked here because a wrong answer stays invisible until the bill arrives. The other two settle elsewhere: **correctness is machine-checkable** at decision 1, which stops a project that cannot be gated; **the agent tools work** is carried rather than vetoed, since Phase 9b runs no agent and only a real failure or the optional verification exercises them.
 
 **Can the bot act on this repo?** Two settings, both **blocking findings**. Both need a GitHub remote and a working `gh` — the two items below. If either of those is missing, this check is deferred with them rather than failing Phase 0: record it as unresolved and carry it into the Phases 7–10 pending list. Either one wrong and every cycle runs Diagnose, Red, Fix and the gate — spending agent calls — then dies at the PR or the merge. Forever, and loudly, so nothing bad merges; the loop simply never works.
 
