@@ -42,25 +42,7 @@
 # the dispatched branch on a --ref self-test. If it is protected, grant the bot a
 # bypass or the rollback push fails (the workflow escalates loudly rather than
 # failing silently).
-#
-# Repo vars/secrets beyond watch.yml:
-#   SHL_TEST_CMD    (var: full suite command, e.g. "npx vitest run", "python -m pytest",
-#                    "go test ./...", "bundle exec rspec")
-#   SHL_TEST_ONE    (var: single-file command WITH a {} placeholder, e.g. "npx vitest run {}")
-#   SHL_DEPLOY_CMD  (var: deploy command, or empty to skip deploy)
-#   SHL_REPRO_PATH  (var, REQUIRED: where the reproducing test is written, with a
-#                    literal {} for the issue number, e.g. "tests/repro-issue-{}.test.ts"
-#                    or "spec/repro_{}_spec.rb". No default — no path is correct
-#                    across languages, so an unset one raises rather than steering
-#                    Diagnose at a pytest convention on a non-Python target.)
-#   SHL_TEST_GLOBS  (var, optional: comma-separated EXTRA globs naming this
-#                    target's test files, added to the built-in filename
-#                    conventions. Needed only for directory conventions such as
-#                    jest's "*__tests__/*"; without it those files are invisible
-#                    to the gate's no-weakening check.)
-#
-# Reference template; the installer adapts it.
-name: sh-heal
+name: shl-heal
 on:
   workflow_dispatch: {}
 
@@ -114,16 +96,7 @@ jobs:
       # wins. Carries no secrets: `secrets.*` is a separate context that
       # toJSON(vars) does not reach.
       SHL_VARS: ${{ toJSON(vars) }}
-      # The branch this cycle operates on: whatever ref dispatched it.
-      # A scheduled run always fires on the default branch, so production
-      # behaviour is unchanged. Dispatching with `--ref <branch>` instead
-      # keeps the ENTIRE cycle — checkout, PR base, merge, verify, incident
-      # record — on that branch, which is what makes the one-time self-test
-      # safe to run against a real repo without touching the default branch.
       TARGET_BRANCH: ${{ github.ref_name }}
-      # Which branch the health URL actually describes. SHL_HEALTH_URL names one
-      # deployment, so probing it from a branch cycle reports on the default
-      # branch's code and reverts a correct fix as a regression.
       DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
       # Pins every step of this cycle to one evidence dir. Without it each
       # `loop.py` invocation is a separate process and would open its own.
@@ -147,9 +120,7 @@ jobs:
       # opencode-ai` beside `SHL_HARNESS: opencode` installs whatever shipped
       # that morning, while the config describing its permission keys is pinned
       # to one release — so the restriction the framework verified is not
-      # necessarily the one running. An unset variable also rendered an EMPTY
-      # run: body here, which exits 0 and leaves Diagnose to die on
-      # command-not-found three steps later.
+      # necessarily the one running.
       - name: Install harness
         run: |
           PYTHONPATH=.shl python -B -c "
@@ -221,7 +192,7 @@ jobs:
             echo "pre-existing failures: $(grep -c . "$ev/baseline_failures.txt" || echo 0)"
           fi
 
-      # 3. Diagnose (read-only agent). Holds the provider token, runs no test code.
+      # Diagnose (read-only agent). Holds the provider token, runs no test code.
       - name: Diagnose
         if: success() && steps.w.outputs.go == 'true'
         working-directory: .shl
@@ -322,35 +293,6 @@ jobs:
             git add "$(cat .shl/frozen_path.txt)"
             git commit -m "frozen reproducing test (red)" || true
           fi
-          # Record what git will EXECUTE from, immediately before the agent runs.
-          # git runs its own config: core.fsmonitor, core.pager, core.sshCommand,
-          # diff.external, a filter.*.clean, and anything in .git/hooks/. A fix
-          # that writes one of those owns the next `git` invocation — which is
-          # `git add -A` at the gate and `git commit`/`git push` under GH_TOKEN.
-          # `.git/` is untracked, so it appears in NO diff: the gate and the
-          # Review agent are both structurally blind to this, and the check has
-          # to compare before against after rather than inspect a diff.
-          #
-          # ACCEPTED GAP, and the precision below is deliberate: what this
-          # block measures is FILES. Git also takes executable configuration from the
-          # ENVIRONMENT — GIT_CONFIG_COUNT/GIT_CONFIG_KEY_*/GIT_CONFIG_VALUE_*
-          # set core.hooksPath, and GIT_SSH_COMMAND, GIT_EXTERNAL_DIFF and
-          # GIT_PROXY_COMMAND each name a program git runs. Verified: with
-          # those set, `git hook run` executes a hook from an attacker path
-          # while .git/config stays byte-identical, so nothing here sees it.
-          # Fix can reach that surface by appending to its own $GITHUB_ENV,
-          # which applies to every LATER step — including the one that runs
-          # `git push` under GH_TOKEN.
-          #
-          # Not closed by measuring the environment, and the reason is what
-          # measuring the wrong thing costs here. This block and the guard's
-          # copy run in DIFFERENT steps, so anything compared between them must
-          # be identical across a step boundary or the guard refuses every
-          # cycle — which is exactly how hashing the two paths above failed.
-          # Env is not reliably identical across that boundary, and a guard
-          # that fails closed on every cycle blocks the loop completely while
-          # looking like a working check.
-          #
           # The guard re-runs this block verbatim. The two must stay identical:
           # a baseline measuring a different surface from the comparison is not
           # a check.
@@ -358,16 +300,10 @@ jobs:
             find .git/hooks \( -type f -o -type l \) ! -name '*.sample' -exec sha256sum {} + 2>/dev/null | sort || true
           } > "$RUNNER_TEMP/git-exec-surface.before"
           # The VERDICT rests on this step output; the file above is kept only
-          # so the error message can show what moved. RUNNER_TEMP is outside the
-          # checkout but it is not a permission boundary — nothing in either
-          # harness denies the agent writes there, and the tamper's own payload
-          # runs during the guard step, early enough to restore .git/config and
-          # rewrite the record together. A completed step's outputs cannot be
-          # rewritten by a later step, which is the property this needs and the
-          # only one here that a write cannot reach.
+          # so the error message can show what moved.
           echo "git_surface=$(sha256sum < "$RUNNER_TEMP/git-exec-surface.before" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
 
-      # 4. Fix (source-only agent; no shell). Holds provider token (agent) +
+      # Fix (source-only agent; no shell). Holds provider token (agent) +
       # GH_TOKEN (escalate comment). Runs no test code itself.
       - name: Fix
         if: success() && steps.w.outputs.go == 'true'
@@ -382,40 +318,13 @@ jobs:
             gh issue comment "${{ steps.issue.outputs.number }}" --body "🤖 escalated to human: attempt cap reached"
             echo "escalated=true" >> "$GITHUB_OUTPUT"
           fi
-      # Runs IMMEDIATELY after Fix and before anything imports from the loop
-      # tree. The gate's `is_loop_tree_touched` covers the same ground, but
-      # `guardrails.cli` is imported FROM `.shl/`, so a fix that edited
-      # `gate.py` would be judged by the edited copy: that check cannot catch a
-      # tamper against itself. This step depends on nothing the agent can write,
-      # which is what makes it a second control rather than a restatement.
-      #
-      # Both halves are load-bearing. `git diff` reports MODIFIED tracked files
-      # only, so creation is invisible to it — and a created file is the cheaper
-      # tamper: `PYTHONPATH=.shl python -B ...` imports `.shl/sitecustomize.py`
-      # at interpreter startup, before `-m guardrails.cli` loads, and `-B`
-      # disables bytecode rather than `site`. The vendored .gitignore covers
-      # scratch, not `*.py`, so such a file would be committed and run every
-      # later cycle. `ls-files --others --exclude-standard` honours that
-      # .gitignore, so ordinary cycle scratch stays quiet while a new source
-      # file is named.
       - name: Loop tree untouched — checked by git, not by the loop
         if: success() && steps.w.outputs.go == 'true' && steps.fix.outputs.escalated != 'true'
         run: |
-          # FIRST, before this step runs git at all. git executes core.fsmonitor
-          # and friends on the NEXT invocation, whichever step makes it — so a
-          # guard that calls git before measuring git hands the tamper its cue:
-          # the payload fires, restores .git/config, rewrites the record, and
-          # the comparison below then finds nothing. Reproduced on git 2.43.0.
-          # sha256sum and find are not git, so the measurement can come first.
-          #
-          # Same family as the two checks below — the loop tree holds the judge,
-          # git's config holds something that runs before the judge is reached —
-          # but it goes first because it is the only one whose subject executes.
           # Whole-content comparison rather than a list of dangerous keys: an
           # enumeration goes stale the next time git adds a setting, and stops
           # covering it without saying so.
-          # Byte-identical to the pre-Fix block in `Branch fix/issue-N`, which
-          # states what this measures and what it accepts as out of reach.
+          # Byte-identical to the pre-Fix block in `Branch fix/issue-N`.
           { sha256sum .git/config "$HOME/.gitconfig" 2>/dev/null || true
             find .git/hooks \( -type f -o -type l \) ! -name '*.sample' -exec sha256sum {} + 2>/dev/null | sort || true
           } > "$RUNNER_TEMP/git-exec-surface.after"
@@ -435,7 +344,6 @@ jobs:
             [ -n "$created" ] && printf 'created: %s\n' "$created"
             exit 1
           fi
-      # 5. Gate. UNTRUSTED CODE RUNS in the suite step — no secrets there.
       # Positive proof that the bug is fixed: run ONLY the frozen reproducing
       # test and keep its exit code. Inferring "it passed" from its absence in a
       # failure list is wrong — a test that errors at collection is absent too,
@@ -499,23 +407,6 @@ jobs:
           ") > .shl/current_raw.txt
             PYTHONPATH=.shl python -B -m guardrails.cli scrub --text .shl/current_raw.txt > "$ev/current_failures.txt"
           fi
-      # The same check again, because the one after Fix is no longer current:
-      # `Green` and `Run suite` above ran agent-authored test code with a full
-      # shell after it passed. Every step below starts an interpreter with
-      # `PYTHONPATH=.shl`, which imports `.shl/sitecustomize.py` at startup
-      # before `-m guardrails.cli` loads — `-B` disables bytecode, not `site`,
-      # and the vendored .gitignore covers scratch, not `*.py`. So a repro test
-      # that plants that file is executed by the gate that judges the fix, by
-      # the two steps carrying the GitHub write credential, and by the review
-      # carrying the provider credential.
-      #
-      # ONLY the git-only half repeats, and that is the whole reason a second
-      # guard step is safe here. Both of its commands are fresh queries against
-      # the working tree with no baseline, so neither can disagree with an
-      # earlier measurement. The execution-surface hash above is deliberately
-      # NOT repeated: it compares a value across a step boundary, and a
-      # cross-step comparison in this guard is what once made the loop refuse
-      # every cycle on every repo, unconditionally, with a green suite.
       - name: Loop tree untouched again — the suite ran agent code after the last check
         if: success() && steps.w.outputs.go == 'true' && steps.fix.outputs.escalated != 'true'
         run: |
@@ -585,8 +476,8 @@ jobs:
           n="$(python -B -c "import sys; sys.path.insert(0,'.shl'); from gh_state import count_attempts; print(count_attempts(${{ steps.issue.outputs.number }}))")"
           gh issue comment "${{ steps.issue.outputs.number }}" --body "🤖 fix attempt $((n+1)) failed: gate or suite"
 
-      # Commit + PR. Force-push a disposable bot branch (each attempt is a fresh
-      # fix from main; the prior attempt's branch content is not needed), and
+      # Force-push a disposable bot branch (each attempt is a fresh fix from
+      # TARGET_BRANCH; the prior attempt's branch content is not needed), and
       # reuse the open PR if one exists — a stable branch pushed without --force
       # non-fast-forwards, and the cycle then spins silently.
       - name: Commit + PR
@@ -604,7 +495,7 @@ jobs:
           fi
           echo "$url" > .shl/pr_url.txt
 
-      # 7. Review (read-only agent). Holds provider token, runs no test code.
+      # Review (read-only agent). Holds provider token, runs no test code.
       - name: Review
         if: success() && steps.w.outputs.go == 'true' && steps.fix.outputs.escalated != 'true'
         id: rev
@@ -665,7 +556,7 @@ jobs:
             echo "::warning::review approved with no reason to publish"
           fi
 
-      # 8. Merge synchronously (--auto would race Deploy).
+      # Merge synchronously (--auto would race Deploy).
       - name: Merge
         id: merge
         if: success() && steps.rev.outputs.approved == 'true'
@@ -694,7 +585,7 @@ jobs:
           fi
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
 
-      # 9. Deploy runs the operator's deploy command. It may need its own
+      # Deploy runs the operator's deploy command. It may need its own
       # credential — a platform CLI token, a registry key — which is a separate
       # secret from the agent token and never reaches an agent-adjacent step.
       # `secrets` is its own context: it is not in `toJSON(vars)`, and a
@@ -799,11 +690,10 @@ jobs:
               echo "::error::post-merge regression — tests that were passing before this fix now fail:"
               printf '%s\n' "$regressions"
             elif [ "$suite_rc" != "0" ] && [ "$parsed" = "0" ]; then
-              # guardrails/cli.py refuses this exact shape BEFORE the merge. Not
-              # carrying it over left the post-merge check — the one whose remedy
-              # is a rollback — reading a suite that never ran as a suite with
-              # nothing wrong, so a fix that breaks the build ships and records
-              # outcome=merged.
+              # guardrails/cli.py refuses this exact shape BEFORE the merge.
+              # Without it here — where the remedy is a rollback — a suite that
+              # never ran reads as a suite with nothing wrong, so a fix that
+              # breaks the build ships and records outcome=merged.
               bad=1
               echo "::error::the merged suite exited $suite_rc and the adapter parsed no failing test at all; it could not run, which is not the same as nothing failing"
             fi
@@ -817,14 +707,6 @@ jobs:
           # green suite beside a service returning 502 is precisely the state
           # that must roll back. Ask the adapter; "skip" when it cannot say.
           #
-          # Only where the URL points, though. SHL_HEALTH_URL names ONE
-          # deployment, so on a branch cycle the probe reads the default
-          # branch's deployment: a different commit, which reports as a
-          # post-deploy regression and reverts a correct fix. Repointing the
-          # variable at a branch alias does not rescue it either, because
-          # platforms commonly put preview deployments behind authentication and
-          # answer an unauthenticated probe with a redirect. The suite above
-          # still runs on every ref; only the deployment probe is scoped.
           # Fail closed rather than skipping: an empty comparand makes every
           # cycle take the skip branch forever and report success, which is the
           # silent shape this check exists to avoid.
@@ -879,8 +761,7 @@ jobs:
           # silently wrong the moment HEAD has moved: the deploy command may
           # commit a version bump or a lockfile, and Verify pulls after Deploy.
           # The revert then succeeds against the wrong commit, pushes, comments
-          # "reverted", and records outcome=reverted while the bad fix is live —
-          # worse than the abort this replaced, which at least failed loudly.
+          # "reverted", and records outcome=reverted while the bad fix is live.
           if [ -z "$MERGE_SHA" ]; then
             gh issue create --title "URGENT: cannot roll back #${{ steps.issue.outputs.number }}" --body "🤖 a post-deploy regression was detected but the merge commit is unknown, so there is nothing safe to revert. The bad fix is LIVE and human action is required."
             exit 1
@@ -890,14 +771,11 @@ jobs:
             # A push-triggered target has no deploy command; its redeploy is
             # the revert push above.
             #
-            # Ref-scoped for the same reason Deploy is, and this is the sibling
-            # call site that guard was not copied to. Verify's suite half runs
+            # Ref-scoped for the same reason Deploy is. Verify's suite half runs
             # on every ref, so a branch verification cycle can reach here and
             # would then run the operator's PRODUCTION deploy from a branch.
             # Skips rather than exiting 1 on an unknown default branch: the
-            # revert is already pushed by this point, and aborting between the
-            # revert and the escalation is the one failure shape this step keeps
-            # being bitten by.
+            # revert is already pushed by this point.
             if [ -n "$DEPLOY_CMD" ]; then
               if [ -n "$DEFAULT_BRANCH" ] && [ "$TARGET_BRANCH" = "$DEFAULT_BRANCH" ]; then
                 eval "$DEPLOY_CMD"
@@ -911,7 +789,7 @@ jobs:
             exit 1
           fi
 
-      # 10. Record incident memory + persist it on the target branch (else an ephemeral runner
+      # Record incident memory + persist it on the target branch (else an ephemeral runner
       # loses it and the loop never learns). No agent-authored code here.
       - name: Record incident
         if: success() && steps.rev.outputs.approved == 'true'
@@ -942,12 +820,10 @@ jobs:
       # one failing step silently skips all of them: merged, possibly deployed,
       # never verified, never rolled back, with nothing on the issue. The only
       # other failure handler above is scoped to the gate and the suite, which
-      # are both pre-merge — so this window had no handler at all, and a crashed
-      # Review has already put a cycle in it.
+      # are both pre-merge.
       #
-      # Reaches for `steps.merge.outcome` rather than `success()`: by definition
-      # this runs when the job is failing, so it must ask whether the merge
-      # specifically got through.
+      # By definition this runs when the job is failing, so it cannot gate on
+      # `success()`: it must ask whether the merge specifically got through.
       - name: Escalate a post-merge failure
         if: always() && steps.merge.outputs.merged == 'true' && job.status == 'failure'
         env:
@@ -955,16 +831,15 @@ jobs:
         run: |
           gh issue comment "${{ steps.issue.outputs.number }}" --body "🤖 URGENT: the fix for this issue MERGED (${{ steps.merge.outputs.sha }}) and the cycle then failed before it could be verified or rolled back. It is live and unverified. Human action required: check the run log, and revert manually if the deployment is bad. No attempt was recorded, so the loop will not retry this on its own."
 
-      # 11. Evidence: what each agent was asked and answered, plus the gate and
+      # Evidence: what each agent was asked and answered, plus the gate and
       # suite output. `always()` is the point — a cycle that dies at the gate is
       # exactly the one whose evidence someone needs. The runner is ephemeral,
       # so an artifact is the only way this survives.
       #
-      # This step holds NO secret and runs no agent-authored code, per the
-      # secret discipline at the top of this file. Contents are already scrubbed
-      # by evidence.py, but the artifact is downloadable by anyone with repo read
-      # access: set the SHL_EVIDENCE_UPLOAD variable to "false" on targets where
-      # even scrubbed logs must not leave the runner.
+      # Contents are already scrubbed by evidence.py, but the artifact is
+      # downloadable by anyone with repo read access: set the
+      # SHL_EVIDENCE_UPLOAD variable to "false" on targets where even scrubbed
+      # logs must not leave the runner.
       - name: Upload evidence
         if: always() && vars.SHL_EVIDENCE_UPLOAD != 'false'
         uses: actions/upload-artifact@v7

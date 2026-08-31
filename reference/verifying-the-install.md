@@ -25,7 +25,7 @@ If any of that is unacceptable, do not run this. The loop still works; you simpl
   ```bash
   cd .shl && PYTHONPATH=. python3 -B -c "from adapters import load_adapter; print(load_adapter().read_log())"
   ```
-- [ ] **Dispatch the watch on that branch**, or use *Actions → sh-watch → Run workflow* and select it.
+- [ ] **Dispatch the watch on that branch**, or use *Actions → shl-watch → Run workflow* and select it.
 
     ```bash
     gh workflow run watch.yml --ref self-healing-loop-install

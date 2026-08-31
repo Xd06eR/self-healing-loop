@@ -282,7 +282,7 @@ gh workflow run watch.yml --ref self-healing-loop-install
   ```bash
   cd .shl && PYTHONPATH=. python3 -B -c "from adapters import load_adapter; print(load_adapter().read_log())"
   ```
-- [ ] Dispatch the watch as above (or *Actions → sh-watch → Run workflow*, selecting that branch). Confirm the whole chain: issue filed, reproducing test written and RED, fix applied, gate green, PR opened, review passed, merge, deploy if configured, verify, incident recorded.
+- [ ] Dispatch the watch as above (or *Actions → shl-watch → Run workflow*, selecting that branch). Confirm the whole chain: issue filed, reproducing test written and RED, fix applied, gate green, PR opened, review passed, merge, deploy if configured, verify, incident recorded.
 - [ ] **Must-pass: prove the gate BLOCKS a weakened test.** There is no way to inject a fix into a cycle — the agent authors it — so run the gate against a weakened diff directly. Delete an assertion from any test file, then:
 
   ```bash

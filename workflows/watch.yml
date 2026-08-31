@@ -1,14 +1,6 @@
 # Reference workflow — copied into a target repo's .github/workflows/ at install.
 # Cron-driven watch: read+compact the target log; dispatch heal on a failure signal.
-#
-# Repo vars/secrets this needs (set per target):
-#   SHL_ADAPTER                                                      (var)
-#   SHL_LOG_TOKEN     (secret: only when the log source is the host's, not the repo's)
-#   SHL_SETUP_CMD           (var: installs the TARGET's own deps — whatever a clean checkout runs
-#                            before its tests work, e.g. "npm ci", "pip install -r requirements.txt",
-#                            "bundle install", "go mod download". Empty only if the target needs
-#                            none. heal.yml uses it too.)
-name: sh-watch
+name: shl-watch
 on:
   # SHIPS DISABLED, DELIBERATELY. The loop merges to the default branch
   # unattended, so it must not start on its own the moment it is installed.
@@ -17,20 +9,6 @@ on:
   # including the must-pass case (a test-weakening fix is BLOCKED), and has read
   # any test suite the installer generated — that suite is what the gate rests
   # on. Until then, trigger by hand.
-  #
-  # Cadence is bounded by the LOG SOURCE's retention, not by taste. A log the
-  # project writes to disk does not expire, so a few hours is fine. A HOSTED
-  # log source does expire, and the shortest retention tiers are measured in
-  # hours — poll slower than that and most failures age out unseen, so the
-  # loop idles and looks healthy while the evidence disappears. Take the
-  # retention from the platform's own docs (it is recorded in SETUP.md as a
-  # decision) and set the interval well inside it. Scheduled runs are also
-  # delayed under load, so leave real headroom and have read_log query a
-  # FIXED window wider than the interval, and let fingerprint dedup absorb the
-  # overlap. Do NOT derive the window from the last run's timestamp: that
-  # shells out to `gh`, and the step calling read_log withholds GH_TOKEN on
-  # purpose, because it parses an untrusted log. The call raises and takes the
-  # whole watch down on every tick, which reads as a healthy quiet project.
   #
   # schedule:
   #   - cron: "0 */3 * * *"
