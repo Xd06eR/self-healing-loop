@@ -196,7 +196,7 @@ class ReproducibleIsDescribedAsABoolean(unittest.TestCase):
 
     def test_the_template_offers_the_two_literals(self):
         text = _template(AgentRole.DIAGNOSE)
-        self.assertRegex(text, r"reproducible:\s*true or false")
+        self.assertRegex(text, r"`?reproducible`?:\s*true or false")
         self.assertNotIn('reproducible: "true"', text)
 
 

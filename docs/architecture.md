@@ -16,6 +16,20 @@ The adapter deliberately does not deploy or roll back. The workflow runs the ope
 
 A new target is a new adapter, never a new pipeline.
 
+## Log quality is the ceiling on everything downstream
+
+`read_log` is the only required method because the log is the loop's only input, and every link in the chain below it fails **quietly** rather than loudly. This is a property of the design worth stating whole, because each consequence is otherwise met one at a time as a local surprise.
+
+- **A failure the log never records does not exist to the loop.** An exception caught by a handler that returns 200 writes nothing, so the loop idles and idle is indistinguishable from healthy.
+- **Compaction keeps only lines carrying error vocabulary and a trace.** A defect that logs a plain sentence is discarded before any agent sees it.
+- **Identity needs frames.** `Type@path:line` comes from the stack, so a log carrying messages without traces yields no fingerprint, and `unfingerprintable` refuses the cycle. Issue dedup, incident recall and the attempt cap all key on that identity and die together.
+- **Minified frames need sourcemaps resolved before `read_log` returns.** A build-hashed chunk name changes every deploy, so one recurring bug fingerprints differently each time and incident memory can never match.
+- **Retention shorter than the cron loses failures unseen**, which again reads as a quiet project.
+
+Downstream of all that, **only Diagnose sees the log**: Fix and Review are given the issue it wrote. So log quality sets the ceiling on the whole cycle's correctness, and the two later roles cannot detect a thin one. `templates/diagnose.md` answers that half by telling Diagnose to say so when the log cannot carry a root cause, rather than inventing a plausible one.
+
+The practical consequence for an operator is that improving the loop past a certain point means improving the project's own logging, not the framework. `README.md` says so before anyone installs, and `reference/platforms.md` carries the per-surface mechanics.
+
 ## AgentAdapter — one per harness
 
 A harness is **data**: one `HarnessConfig` (install, argv template, per-role restriction flags, the verification it offers, model env vars, auth and base-url env) plus one `render()`. Adding a harness is authoring a config, with zero framework code.
