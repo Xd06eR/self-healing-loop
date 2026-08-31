@@ -113,7 +113,7 @@ class TestIsTestWeakened(unittest.TestCase):
         self.assertFalse(is_test_weakened(""))
 
     def test_rename_out_of_test_prefix_still_caught(self):
-        # H2: renaming test_x.py to old_x.py and gutting asserts must not evade.
+        # Renaming test_x.py to old_x.py and gutting asserts must not evade.
         diff = (
             "diff --git a/tests/test_x.py b/tests/old_x.py\n"
             "rename from tests/test_x.py\n"
@@ -124,7 +124,7 @@ class TestIsTestWeakened(unittest.TestCase):
         self.assertTrue(is_test_weakened(diff))
 
     def test_expected_failure_marker_caught(self):
-        # H3: @unittest.expectedFailure / @pytest.mark.xfail-style defeat.
+        # Defeat by marker: @unittest.expectedFailure / @pytest.mark.xfail.
         diff = (
             "diff --git a/tests/test_x.py b/tests/test_x.py\n"
             "@@ -1 +1,2 @@\n"
@@ -221,7 +221,7 @@ class TestFrozenTest(unittest.TestCase):
 
 class TestTestConfigTouched(unittest.TestCase):
     def test_conftest_edit_flagged(self):
-        # N3: skipping the frozen test via conftest collect_ignore must be caught.
+        # Skipping the frozen test via conftest collect_ignore must be caught.
         diff = (
             "diff --git a/conftest.py b/conftest.py\n"
             '+collect_ignore = ["tests/test_repro.py"]\n'
@@ -238,7 +238,8 @@ class TestTestConfigTouched(unittest.TestCase):
 
 
 class TestTestConfigTouchedAcrossLanguages(unittest.TestCase):
-    """N3's hole is only closed for the languages the config list names.
+    """Excluding the frozen test via the runner's config is only blocked for
+    the languages the config list names.
 
     A frozen test is useless if Fix can edit the runner's config to exclude it.
     A name list of `conftest.py`/`pytest.ini`/`pyproject.toml`/... covers Python

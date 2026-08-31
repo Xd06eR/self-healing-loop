@@ -189,7 +189,8 @@ class ACorruptRowDoesNotTakeMemoryDownWithIt(unittest.TestCase):
         self.assertEqual(kept, [])
 
     def test_one_string_is_refused_rather_than_matching_nothing(self):
-        # The L8 defect's exact shape: a raw log line handed in as an identity.
+        # The exact shape that kept incident memory dead while its tests passed:
+        # a raw log line handed in as an identity.
         # Both silent readings of it — one identity, or a bag of characters —
         # return no matches, which reads as "this failure is new".
         self._write(json.dumps(self.GOOD))
@@ -213,7 +214,7 @@ class WhatIsCommittedToTheRepoIsScrubbed(unittest.TestCase):
 
     Scrubbed inside `record_cycle` rather than at the workflow call site,
     because the workflow is one caller of several and a rule every caller must
-    remember is the drift this project keeps paying for (L9).
+    remember is the drift this project keeps paying for.
     """
 
     SECRET = "sk-ant-api03-AAAABBBBCCCCDDDDEEEEFFFFGGGGHHHHIIIIJJJJKKKK"

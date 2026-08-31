@@ -129,9 +129,9 @@ class TestRecallIncidents(unittest.TestCase):
 class TestReproPath(unittest.TestCase):
     """One implementation of "where does the repro test go", for every driver.
 
-    L9: when two drivers must do the same thing they drift, and the untested
-    one is the one that ships. The workflow shell and loop.py both need this
-    path, so they call one function rather than each substituting the pattern.
+    When two drivers must do the same thing they drift, and the untested one is
+    the one that ships. The workflow shell and loop.py both need this path, so
+    they call one function rather than each substituting the pattern.
     """
 
     def setUp(self):
@@ -195,7 +195,7 @@ class TestRunReviewContext(unittest.TestCase):
             # The shape `main()` actually supplies: Diagnose's `repro_test`
             # object, JSON-encoded. A bare string was never reachable from the
             # driver, and a fixture the product cannot produce tests a contract
-            # nothing has (L8).
+            # nothing has.
             repro=json.dumps({"code": "expect(x).toBe(1)"}),
         )
         prompt = " ".join(calls[0][0])

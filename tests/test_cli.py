@@ -917,8 +917,9 @@ class TheGateRefusesADiffItCannotReadTheContentOf(unittest.TestCase):
 
     The sibling `.gitattributes` check shipped with three unit tests and no test
     of its wiring, so replacing its call with a constant `None` left the suite
-    green — the project's own L9, inside the file that enforces L9. This class
-    exists so the same cannot be true of this check.
+    green: calling the function is not exercising the seam the product uses,
+    inside the file whose whole job is to exercise that seam. This class exists
+    so the same cannot be true of this check.
 
     The scenario is real rather than constructed: verified against git 2.43.0,
     removing an assertion from `tests/test_x.py` BLOCKS as a text diff and

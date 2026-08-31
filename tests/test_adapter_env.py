@@ -149,7 +149,8 @@ class OnlyTheAdapterItselfIsOptional(unittest.TestCase):
     an import raised INSIDE the adapter's own module body — a missing SDK, a
     typo, a circular import — and every consumer then reads "this stack has no
     custom identities". `record_cycle` stores an empty fingerprint list, which
-    matches nothing forever: the L8 defect this seam was built to close.
+    matches nothing forever — a mechanism entirely dead while every test over
+    it stays green, which is the defect this seam exists to close.
     """
 
     def setUp(self):

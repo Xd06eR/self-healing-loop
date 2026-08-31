@@ -41,14 +41,14 @@ class EveryStepStillParsesAsShell(unittest.TestCase):
 
     # EVERY var, not a curated subset of the ones the framework calls optional.
     #
-    # This list used to name the five that are legitimately empty in a real
-    # install, which encoded a false premise: GitHub substitutes the empty
-    # string for any variable that is not set, whether or not the framework
-    # considers it required. `SHL_TEST_CMD` is required and was therefore never
-    # rendered empty — and empty it turns `Run suite` into a redirect with no
-    # command (rc 0, an empty log, so the gate approves a fix on a suite that
-    # never ran) and the whole `Verify` body into a bash parse error, which
-    # takes Rollback and Record down with it because both are gated on success.
+    # Naming only the five that are legitimately empty in a real install encodes
+    # a false premise: GitHub substitutes the empty string for any variable that
+    # is not set, whether or not the framework considers it required. On that
+    # premise `SHL_TEST_CMD` never gets rendered empty — and empty it turns
+    # `Run suite` into a redirect with no command (rc 0, an empty log, so the
+    # gate approves a fix on a suite that never ran) and the whole `Verify`
+    # body into a bash parse error, which takes Rollback and Record down with
+    # it because both are gated on success.
     #
     # A step whose syntax depends on a value is broken for whoever mistypes the
     # variable name once. Rendering the required ones empty costs nothing and is
@@ -359,7 +359,7 @@ class GitsOwnExecutionSurfaceIsWatched(unittest.TestCase):
         what BOTH of them hash, and the two blocks are separate text that has
         to be kept in step by hand.
 
-        The ceiling, stated because it used to be asserted as coverage: the
+        The ceiling, stated so it is not mistaken for coverage: the
         Actions file commands (`$GITHUB_ENV`, `$GITHUB_PATH`) reach every later
         step and are NOT covered here. Their paths are per-step, so neither end
         of a before/after comparison can name the file Fix actually wrote.
@@ -1150,10 +1150,10 @@ def steps_body(name: str, workflow: str = "heal.yml") -> str:
 
 
 class IssueDedupIsFingerprintKeyed(unittest.TestCase):
-    """`CLAUDE.md`: "Keying on the title cannot work — it is prose a
-    model writes fresh each cycle." That rule binds issue dedup exactly as it
-    binds incident memory: here a miss files a duplicate issue for a failure
-    already being worked, which resets the attempt cap to zero.
+    """`docs/subsystems.md`: "A title cannot work: it is prose a model writes
+    fresh each cycle." That rule binds issue dedup exactly as it binds incident
+    memory: here a miss files a duplicate issue for a failure already being
+    worked, which resets the attempt cap to zero.
     """
 
     def setUp(self):
@@ -1221,7 +1221,7 @@ class EveryIdentityIsDerivedFromTheRawLog(unittest.TestCase):
                             self.assertIn("signal.raw", line, line)
         # Refuse to pass vacuously: with the commands renamed or removed the
         # loop above never runs, and a check that examined nothing reads
-        # exactly like one that examined everything (L8).
+        # exactly like one that examined everything.
         self.assertEqual(checked, 3, "expected find-issue once and the marker twice")
 
     def test_watch_is_asked_to_write_the_raw_log(self):
@@ -1461,7 +1461,7 @@ class CheckoutStaysWhereTheGitGuardCanSeeIt(unittest.TestCase):
     The usual reason to upgrade does not apply: v5 is already Node 24, and the
     floating major keeps taking security backports. So this is a decision, not
     a stale pin, and a routine bump would undo it without anyone reading why.
-    Reasoning in `CLAUDE.md` under residual risks.
+    Reasoning in `workflows/CLAUDE.md`, which owns the git guard.
     """
 
     def test_both_workflows_still_check_out_at_v5(self):
@@ -1475,7 +1475,7 @@ class CheckoutStaysWhereTheGitGuardCanSeeIt(unittest.TestCase):
             self.assertIn(
                 "actions/checkout@v5", line,
                 "checkout was bumped; v6+ moves the credential out of .git/config, "
-                "which is the surface the pre-Fix git guard hashes. Read CLAUDE.md "
+                "which is the surface the pre-Fix git guard hashes. Read workflows/CLAUDE.md "
                 "before changing this.",
             )
 
@@ -1683,8 +1683,7 @@ class ActionlintAcceptsTheShippedWorkflows(unittest.TestCase):
 
         Without this, an `actionlint` silently pointed at nothing, or invoked
         with a flag it rejects, produces the same green as a genuinely clean
-        file. That is the vacuous-test failure mode (L8), so the check gets
-        checked.
+        file. That is the vacuous-test failure mode, so the check gets checked.
         """
         broken = (WORKFLOWS / "heal.yml").read_text(encoding="utf-8").replace(
             "runs-on: ubuntu-latest", "runs-on: ubuntu-latest\n    timeout-minuts: 60", 1
@@ -1781,7 +1780,7 @@ class ShellSemanticsOnARunner(unittest.TestCase):
 
     Every one of these is invisible to the rest of the suite, because the tests
     and the local harness invoke the same code a different way than the shipped
-    workflow does — the L9 shape, three drivers deep.
+    workflow does: three drivers that must agree, drifting.
     """
 
     def heal(self) -> str:
@@ -2168,11 +2167,11 @@ class EmbeddedPythonMustActuallyRun(unittest.TestCase):
     deployed, unverified, unrecorded.
     """
 
-    # The required newline after the opening quote used to exclude every
+    # No newline required after the opening quote: demanding one excludes every
     # SINGLE-LINE `python -B -c "..."` — three of them, one on the post-merge
     # path where a crash is unrecoverable. Those cannot carry the block-indent
-    # defect this exists for, but `assertGreaterEqual(found, 3)` read as "all of
-    # them" while it was half.
+    # defect this exists for, but `assertGreaterEqual(found, 3)` then reads as
+    # "all of them" while it is half.
     SNIPPET_RE = re.compile(r'python -B -c "(.*?)(?<!\\)"', re.S)
 
     def test_every_embedded_snippet_compiles(self):

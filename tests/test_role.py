@@ -87,11 +87,11 @@ class TestValidateContract(unittest.TestCase):
         self.assertIn("issue_body", str(cm.exception))
 
     def test_reproducible_needs_only_code_no_path(self):
-        # N1 is answered by the workflow composing the path from the issue
-        # number, so Diagnose supplies code alone. Validating an agent-supplied
-        # path against `tests/test_*.py` would answer it too, but that regex is
-        # a pytest convention: every non-Python target dies there and no cycle
-        # can complete.
+        # Where the repro test lands is answered by the workflow composing the
+        # path from the issue number, so Diagnose supplies code alone.
+        # Validating an agent-supplied path against `tests/test_*.py` would
+        # answer it too, but that regex is a pytest convention: every
+        # non-Python target dies there and no cycle can complete.
         validate_contract(
             AgentRole.DIAGNOSE,
             {

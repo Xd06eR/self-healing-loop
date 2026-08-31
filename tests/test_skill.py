@@ -4,9 +4,9 @@
 manifest is listed in one place and copied from another, a template gains a
 placeholder nothing fills, a deleted concept survives in one clause. None of
 that breaks a parse, and none of it is visible until an install goes wrong in
-someone else's repo. F12 is exactly this shape — `SKILL.md` states twice that
-the framework's own `tests/` are not installed, and nothing in the prose stops
-an installer copying all 17 of them anyway.
+someone else's repo. `SKILL.md` states twice that the framework's own `tests/`
+are not installed, and nothing in the prose stops an installer copying all 17
+of them anyway.
 
 Same approach as `test_workflows.py`: read the shipped file, assert structural
 properties, stdlib only.
@@ -124,8 +124,8 @@ class VendoringManifestMatchesReality(unittest.TestCase):
     tree against. That set is written by hand next to a directory that changes,
     so it drifts, and drift is a real failure in both directions: a missing
     entry means a truncated install that dies on import, an extra entry means
-    files copied into a target nobody meant to install (F12, the framework's
-    own `tests/`).
+    files copied into a target nobody meant to install, the framework's own
+    `tests/` being the case that already got through.
     """
 
     # Framework top-level entries that are NOT part of the portable core, with

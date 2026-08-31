@@ -176,9 +176,9 @@ class RestrictionsMatchTheDocumentedCIMode(unittest.TestCase):
     def test_the_restriction_guard_enforces_that_denial(self):
         """A denial nothing asserts is a denial that can be dropped silently.
 
-        This is the project's own L9 inside the file that exists to enforce L9:
-        the argv was right and the guard did not read it. Asserted by driving
-        the guard with the denial removed.
+        Verifying at the wrong seam, inside the file that exists to verify at
+        the right one: the argv is right and the guard does not read it.
+        Asserted by driving the guard with the denial removed.
 
         Every widened role, not one of them. Driving DIAGNOSE alone let a
         mutation that dropped REVIEW from `role_denial` pass — the argv still

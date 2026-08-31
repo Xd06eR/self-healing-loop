@@ -2,9 +2,9 @@ import re
 import unittest
 
 # Captured verbatim from `node run.js` on two genuinely different bugs in one
-# file (L8: drive this with a real artifact, never a hand-written string — tests
-# that invent their own input go green over a completely dead mechanism, which
-# is how incident memory held four passing tests while recalling nothing).
+# file. Drive this with a real artifact, never a hand-written string: tests that
+# invent their own input go green over a completely dead mechanism, which is how
+# incident memory held four passing tests while recalling nothing.
 #
 # The two traces carry the IDENTICAL exception line and differ only in the
 # throw site, which is what makes them the sharp case: with no JS frame parsing
@@ -434,9 +434,9 @@ class AnExceptionGroupTracebackStillYieldsIdentities(unittest.TestCase):
         """The second occurrence differs in exactly the ways one bug does:
         ports, ids, timestamps. Its fingerprints must not.
 
-        An earlier version of this test replaced substrings with themselves,
-        which proved `f(x) == f(x)` and nothing else — the mutation-class
-        defect this whole file exists to catch, written into it.
+        Replacing a substring with itself proves `f(x) == f(x)` and nothing
+        else: the mutation-class defect this whole file exists to catch,
+        written into the file itself.
         """
         # The leaf differs as a DIFFERENT BUG differs: exception type (a
         # message-only change keeps the same signature by design — the message

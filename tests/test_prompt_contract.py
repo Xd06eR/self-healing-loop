@@ -444,7 +444,7 @@ class NoDocCallsAFileUnpolicedThatTheGatePolices(unittest.TestCase):
     its docs against the code precisely to stop both.
     """
 
-    DOCS = ("SKILL.md", "README.md", "artifacts/setup.md",
+    DOCS = ("SKILL.md", "README.md", "artifacts/setup.md", "artifacts/report.md",
             "reference/verifying-the-install.md", "loop_context/CLAUDE.md",
             "templates/fix.md")
     UNPOLICED = re.compile(r"(?i)\bunpoliced\b|\bwalks? past the gate\b|covers [^.]*only\b")
@@ -680,13 +680,13 @@ class TheInjectionReportHasSomewhereToGo(unittest.TestCase):
 
 
 class NothingVendoredCitesALessonNumber(unittest.TestCase):
-    """`(L8)`, `(L9)` and friends resolve only in `CLAUDE.md`, which never ships.
+    """`(L8)`, `(L9)` and friends name a numbered lesson no document defines.
 
-    That file is the framework's dev guide. What lands in a target is
-    `loop_context/CLAUDE.md`, which defines no lesson numbers, so a citation in
-    vendored code points an operator — or an agent reading its own tree — at a
-    document that is not there. Every site that carried one already stated the
-    lesson in the surrounding sentence, so the citation was pure dangle.
+    Nothing in this repo carries such a list, and `loop_context/CLAUDE.md`, the
+    operating doc a target actually receives, defines none either. So a citation
+    in vendored code points an operator — or an agent reading its own tree — at
+    nothing at all. Every site that carries one states the rule in the
+    surrounding sentence regardless, which is what makes the number pure dangle.
 
     Mechanical because the recurrence is: `gate.py` diagnoses this exact hazard
     in its own header and then carried a bare `(L9)` a hundred lines below it.
