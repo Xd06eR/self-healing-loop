@@ -949,8 +949,25 @@ class TheManifestGeneratorRecordsOnlyWhatTheFrameworkOwns(unittest.TestCase):
     they disagree. Same reason the sibling check below executes its snippet.
     """
 
-    TARGET_OWNED = ("adapters/target.py", "SETUP.md", "README.md", "INSTALL-REPORT.md")
-    FRAMEWORK_OWNED = ("loop.py", "guardrails/gate.py", "opencode.json")
+    # The adapter's own tests and its captured fixtures belong here for the same
+    # reason `target.py` does: `reference/adapter.md` has the INSTALLER write
+    # them, against this target's log format, and the framework ships no
+    # `adapters/tests/` to overwrite them with. A fixture is the load-bearing
+    # half — a parser tested only against hand-written strings matches nothing
+    # when it meets a real log — and it carries whatever extension that file
+    # names, so the exclusion cannot key on `.py`.
+    TARGET_OWNED = (
+        "adapters/target.py", "SETUP.md", "README.md", "INSTALL-REPORT.md",
+        "adapters/tests/__init__.py", "adapters/tests/test_target.py",
+        "adapters/tests/panic.fixture", "adapters/tests/deploy.captured",
+    )
+    # `adapters/base.py` and `adapters/__init__.py` sit one directory above the
+    # target's tests and ARE the framework's: an exclusion widened to
+    # `adapters/` would drop the contract every target adapter subclasses.
+    FRAMEWORK_OWNED = (
+        "loop.py", "guardrails/gate.py", "opencode.json",
+        "adapters/__init__.py", "adapters/base.py",
+    )
 
     def snippet(self) -> str:
         text = (REFERENCE / "updating.md").read_text(encoding="utf-8")

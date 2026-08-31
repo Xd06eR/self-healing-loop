@@ -413,9 +413,11 @@ OPENCODE = HarnessConfig(
     #   key is `ask` — which, headless, suspends the run until the job timeout
     #   kills it with no output naming the cause.
     # - `edit` is Fix's alone, and is path-scoped rather than a bare "allow":
-    #   `{"*": "allow", "**/.shl/**": "deny"}`. Fix's cwd IS the
-    #   loop, so an unscoped allow lets it rewrite the gate about to judge it.
-    #   The deny is written last because last match wins.
+    #   a `"*": "allow"` followed by a deny per protected tree, the current set
+    #   being in the file rather than restated here. Fix's cwd IS the loop, so
+    #   an unscoped allow lets it rewrite the gate about to judge it. Every
+    #   deny is written AFTER the wildcard allow because last match wins; their
+    #   order among themselves does not matter, since the patterns are disjoint.
     # - No role allows `bash`, `webfetch` or `websearch`: a read-only role needs
     #   no shell to exfiltrate, only the key in its environment and somewhere to
     #   POST it.

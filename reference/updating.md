@@ -21,7 +21,7 @@ Key the detection on `SETUP.md` rather than on the directory: an aborted install
 
 ## Read the manifest, and say so when there is none
 
-`.shl/manifest.json` records the hash of every file the install wrote **from the framework** — the vendored core and the two workflows, not `adapters/target.py` and not `SETUP.md`, which the framework does not own and never overwrites.
+`.shl/manifest.json` records the hash of every file the install wrote **from the framework** — the vendored core and the two workflows, not `adapters/target.py`, not `adapters/tests/`, and not `SETUP.md`, which the framework does not own and never overwrites.
 
 With it, each framework-owned file falls into exactly one state:
 
@@ -49,10 +49,16 @@ target_owned = {'.shl/adapters/target.py', '.shl/SETUP.md',
 paths = [str(p) for p in pathlib.Path('.shl').rglob('*') if p.is_file()]
 paths += ['.github/workflows/watch.yml', '.github/workflows/heal.yml']
 skip = ('.txt', '.json', '.diff', '.raw', '.pyc')
+# `adapters/tests/` is excluded whole, by directory rather than by name or
+# extension: it holds the adapter's own tests AND the captured fixtures that
+# drive them, and a fixture carries whatever extension the log format
+# suggested. `adapters/__init__.py` and `adapters/base.py` sit one level up
+# and ARE the framework's, so the exclusion stops at the tests directory.
 rec = {p: hashlib.sha256(pathlib.Path(p).read_bytes()).hexdigest()
        for p in sorted(paths)
        if p not in target_owned
        and not (p.endswith(skip) and not p.endswith('opencode.json'))
+       and '/adapters/tests/' not in p
        and '/evidence/' not in p and '/incident_memory/' not in p
        and '__pycache__' not in p}
 pathlib.Path('.shl/manifest.json').write_text(json.dumps(rec, indent=2) + '\n')
@@ -87,12 +93,13 @@ Write the manifest again at the end of the update, covering exactly what you wro
 
 | path | owner | on update |
 |---|---|---|
-| `adapters/target.py` | the target | **never touched.** Written against this project's own log format and test runner; replacing it destroys the install |
+| `adapters/target.py`, `adapters/tests/` | the target | **never touched.** Written against this project's own log format and test runner; replacing it destroys the install. The framework ships no `adapters/tests/`, so a difference there is never staleness — the captured fixture under it is the only thing proving the adapter parses a real log rather than an imagined one |
 | `SETUP.md` | the target | **appended, never rewritten.** Add an evolution entry; every prior decision stays readable |
 | `INSTALL-REPORT.md` | the target | left in place; the update writes its own report |
 | `evidence/`, `incident_memory/` | the cycles | **never touched.** `incident_memory/log.jsonl` is what the loop has learned, and a reverted entry in it is the only thing telling a later cycle that the obvious fix was already tried and made things worse |
 | `README.md` | the target | **re-filled, never copied.** It is generated from `artifacts/readme.md` with this install's values, so copying the framework's own `README.md` over it lands the wrong document entirely, and copying the raw template lands unfilled `{{…}}`. Refresh it by filling the template again from the current `SETUP.md`, and only when the installed copy is unmodified |
-| the vendored core, `CLAUDE.md`, `AGENTS.md` | the framework | overwrite when unmodified, stop when not |
+| the vendored core | the framework | overwrite when unmodified, stop when not |
+| `CLAUDE.md` and `AGENTS.md` | the framework, **from `loop_context/CLAUDE.md`** | overwrite when unmodified, stop when not — and re-vendor from that source, never from the framework root. The root holds a `CLAUDE.md` of its own, its development guide, with `AGENTS.md` symlinked to it; copying that pair across replaces the operating doc all three roles auto-load from cwd `.shl/`, taking with it the JSON output contract the driver parses and the rules keeping the agent out of `.shl/`, off the frozen test and out of test-runner config. The gate still refuses, so the loop dies there every cycle with nothing in the diff naming the cause |
 | `.github/workflows/watch.yml`, `heal.yml` | the framework | overwrite when unmodified — with the exception below |
 
 ### The cron must survive the re-vendor
@@ -112,7 +119,7 @@ Keyed on what you can detect, never on a version number: a condition is a comman
 | a loop directory not named `.shl/` | predates the rename | `git mv` it, then re-vendor **both** workflows — `heal.yml` alone names the path dozens of times |
 | `opencode.json` denies edits under the old directory name | the deny points at a path that no longer exists | re-vendor it |
 | `heal.yml` has no `SHL_VARS` line | predates variable hydration | re-vendor the workflows |
-| a `SHL_*` name the workflows or the adapter read is unset on the repo | the loop reads an empty string at runtime | list them and hand over one `gh variable set` command per line |
+| a `SHL_*` name the workflows or the adapter read is unset on the repo | the loop reads an empty string at runtime, which for most of these names is the correct state | check each against `SETUP.md`'s own `gh variable set` block; hand over a command only for a name that block sets |
 
 **The `opencode.json` row is the one that fails open.** That deny is what stops the Fix agent editing the loop's own tree — the tree holding the gate about to judge its work. Pointed at a directory that no longer exists, it denies nothing and reports nothing.
 
@@ -135,6 +142,8 @@ Left column only: names something reads that nothing sets. It writes no file, de
 **Five names are excluded above, and two of the exclusions are a security boundary rather than noise.** `SHL_CYCLE_ID` and `SHL_VARS` are set by the workflow itself, so reporting them sends the operator to set a variable the next run overwrites. `SHL_AUTH_TOKEN`, `SHL_LOG_TOKEN` and `SHL_DEPLOY_TOKEN` are **secrets**, and the whole output of this command is a list the operator is about to run `gh variable set` against. A secret in that list is an instruction to store a credential as a plaintext repo variable — readable by every step of both workflows, including the ones running test code the loop's own agents wrote. `SHL_VARS` hands the whole variable set to every step as one job-level env var — hydration skips secret names, but the raw blob skips nothing. Check those three with `gh secret list` instead; neither `gh` nor the workflow can read a secret's value back, which is the point of it being one.
 
 **Strip comment lines before matching, as above.** A name discussed in a comment is not a name the workflow reads, and reporting one as missing sends the operator to set a variable nothing consumes. A check that cries wolf is a check people learn to skip.
+
+**What it prints is a candidate list, not a work list, and most of it is optional.** The command reads every `SHL_*` the workflows mention, and the majority are guarded so that unset is the intended state: `SHL_SETUP_CMD`, `SHL_DEPLOY_CMD` and `SHL_EVIDENCE_UPLOAD` each sit behind an `if:` comparing against the empty string, the gate's glob and pattern variables are appended only when non-empty, `SHL_ADAPTER` falls back to `adapters.target`, and `SHL_BASE_URL` and `SHL_AUTH_ENV` are empty on a harness's native provider. So resolve the output against `SETUP.md`'s own `gh variable set` block — the record of what **this** install decided to set — and report the remainder as optional and deliberately unset rather than as work. Handing the raw list over as commands is worse than reporting nothing: `gh` prompts on an empty `--body` and the prompt consumes the next line of the paste, so a list of mostly-spurious lines is also a list that mis-sets whatever follows it.
 
 
 ## What the operator is told

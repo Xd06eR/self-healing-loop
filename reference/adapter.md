@@ -46,7 +46,7 @@ The three properties an identity needs — stable, specific, project-owned — a
 
 ## `health_check()` — implement it if the target deploys anywhere
 
-One cheap request to the deployed service: `True`, `False`, or `None` when there is nothing to probe. Follow `{{HEALTH_STRATEGY}}`.
+One cheap request to the deployed service: `True`, `False`, or `None` when there is nothing to probe. Follow the health strategy recorded in `SETUP.md`, which is where the interview's answer was written down.
 
 The post-deploy suite runs on the runner against merged source and cannot tell you the deployed thing answers.
 
@@ -58,8 +58,10 @@ Test first: write `adapters/tests/test_target.py` and `adapters/tests/__init__.p
 cd .shl && PYTHONPATH=. python3 -B -m unittest adapters.tests.test_target -v
 ```
 
+**That invocation is the only one these tests run under, so confirm the project's own suite does not also collect them.** `test_target.py` matches the gate's built-in `test_*` glob and pytest's default `test_*.py`, and it imports only from cwd `.shl` with `PYTHONPATH=.` — collected from the repo root it dies at import on `No module named 'guardrails'`. Most collectors never reach it, because pytest's default `norecursedirs` skips `.*` and `go test ./...` skips dot-prefixed directories; that is a reason to check rather than a reason to assume, and it is why the install vendors no `tests/` of its own. Run the project's real test command from the repo root and confirm the collected count is what it was before the install. If it does collect from `.shl/`, exclude that directory in the runner's own configuration before going further: the suite is what the gate rests on, so a collection error there blocks every cycle forever over a file the operator was told to write.
+
 **Drive at least one test with a real captured log**, not a hand-written one. `read_log`, `failing_tests` and `failure_ids` all parse output produced by another program, and a test written against imagined output tests the imagination: a parser exercised only with short hand-written strings passes every assertion and still matches nothing when it meets a real log line, so the feature is dead behind a green suite.
 
-**Name captured fixtures with a neutral extension.** `.log` and `.txt` are both swallowed — the first by many projects' own gitignore, the second by the loop's, which treats `*.txt` as cycle scratch. A fixture that is ignored passes locally and vanishes from the commit, so the adapter's tests fail on a fresh clone with no obvious cause. `.fixture` or `.captured` are safe.
+**Name captured fixtures with a neutral extension, and keep them in `adapters/tests/` beside the test that reads them.** `.log` and `.txt` are both swallowed — the first by many projects' own gitignore, the second by the loop's, which treats `*.txt` as cycle scratch. A fixture that is ignored passes locally and vanishes from the commit, so the adapter's tests fail on a fresh clone with no obvious cause. `.fixture` or `.captured` are safe. The directory matters for the same reason the extension does: an update excludes `adapters/tests/` whole as the target's own, so a fixture parked anywhere else is recorded as framework-owned and overwritten by the next refresh.
 
 Where `read_log` or `health_check` needs credentials or a live service, mock it here and flag the real path unverified until the install's own verification exercises it with the operator watching.
