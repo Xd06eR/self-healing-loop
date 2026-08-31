@@ -83,7 +83,7 @@ Only then does it vendor the portable core into `.shl/`, generate the target ada
 
 There is no headless install **by design**. Fitting a loop to a project settles product decisions its owner has to make, and installing can write product code into the repo — a test suite that becomes the gate guarding the default branch, and possibly a public error-reporting endpoint. With nobody to ask, the installer stops and says why.
 
-**By design is the whole of the guarantee.** That behaviour lives in `SKILL.md`'s instructions, and an instruction binds a cooperating agent in a permission mode that asks. It is not a lock: run the installer somewhere that auto-approves writes and there is nothing here to stop it proceeding alone. The design is honest about what it wants; only your harness settles what it can do.
+**By design is the whole of the guarantee.** That behaviour lives in `SKILL.md`'s instructions, and an instruction binds only a cooperating agent in a permission mode that asks. What happens in one that does not is the risk note at the top.
 
 ## Docs
 

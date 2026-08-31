@@ -160,7 +160,7 @@ A decision earns a written reasoning paragraph only when all three hold: **hard 
     cd .shl && PYTHONPATH=. python3 -B -c "import loop, role, evidence, log_compact, gh_state; from guardrails import cli, gate, incident_memory; from adapters.base import TargetAdapter; print('vendored core imports clean')"
     ```
 
-- **Verify, do not just follow.** An instruction is not a check: copy the framework's own `tests/` and, on a target that does not pin `testpaths`, collection walks into them and the gate blocks every cycle forever over files nobody meant to install.
+- **Verify, do not just follow.** An instruction is not a check. If the framework's own `tests/` land here, then on a target that does not pin `testpaths` collection walks into them and the gate blocks every cycle forever over files nobody meant to install.
 
     ```bash
     python3 -c "
@@ -191,7 +191,7 @@ Only the gaps Phase 1 recorded and Phase 2 decided how to close. Full instructio
 
 `TargetAdapter` has **one required method and three optional ones**, and skipping one costs something different each time: one refuses before spending an agent call, one burns a full cycle then blocks at the gate, one lets a dead deployment pass. Which of them this target needs, what each must return, and how to prove it: [reference/adapter.md](reference/adapter.md).
 
-The adapter does not deploy or roll back: the workflow runs `{{DEPLOY_CMD}}` and reverts with `git revert`, and those credentials belong nowhere near an agent-adjacent module.
+The adapter does not deploy or roll back: the workflow runs `{{DEPLOY_CMD}}` and reverts with `git revert`, and those credentials belong nowhere near an agent-adjacent module. `docs/architecture.md` owns that rule; change it there.
 
 - [ ] Write `.shl/adapters/target.py`, ending with `adapter = <TargetAdapterImpl>()`. Honour `{{OFF_LIMITS}}`.
 - [ ] Write its tests **first**, per the reference. Drive at least one with a log the project really produced.
