@@ -108,7 +108,7 @@ Write the manifest again at the end of the update, covering exactly what you wro
 
 Read the installed `schedule` block before overwriting, restore it after, and name the cron you carried across in the report so the operator can check it against what they set.
 
-The same applies to any `env:` line an older install added by hand to reach an adapter variable. Those are no longer needed — repo variables reach the adapter through `SHL_VARS` — but confirm the variable is genuinely readable after the re-vendor rather than assuming the mechanism covers it.
+An older install may also carry `env:` lines added by hand to reach an adapter variable. Those are the opposite case, so do not carry them across: repo variables reach the adapter through `SHL_VARS`, which is what makes the hand-added lines redundant. Confirm the variable is genuinely readable after the re-vendor rather than assuming the mechanism covers it.
 
 ## Migrating an older install
 
