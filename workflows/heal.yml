@@ -499,6 +499,33 @@ jobs:
           ") > .shl/current_raw.txt
             PYTHONPATH=.shl python -B -m guardrails.cli scrub --text .shl/current_raw.txt > "$ev/current_failures.txt"
           fi
+      # The same check again, because the one after Fix is no longer current:
+      # `Green` and `Run suite` above ran agent-authored test code with a full
+      # shell after it passed. Every step below starts an interpreter with
+      # `PYTHONPATH=.shl`, which imports `.shl/sitecustomize.py` at startup
+      # before `-m guardrails.cli` loads — `-B` disables bytecode, not `site`,
+      # and the vendored .gitignore covers scratch, not `*.py`. So a repro test
+      # that plants that file is executed by the gate that judges the fix, by
+      # the two steps carrying the GitHub write credential, and by the review
+      # carrying the provider credential.
+      #
+      # ONLY the git-only half repeats, and that is the whole reason a second
+      # guard step is safe here. Both of its commands are fresh queries against
+      # the working tree with no baseline, so neither can disagree with an
+      # earlier measurement. The execution-surface hash above is deliberately
+      # NOT repeated: it compares a value across a step boundary, and a
+      # cross-step comparison in this guard is what once made the loop refuse
+      # every cycle on every repo, unconditionally, with a green suite.
+      - name: Loop tree untouched again — the suite ran agent code after the last check
+        if: success() && steps.w.outputs.go == 'true' && steps.fix.outputs.escalated != 'true'
+        run: |
+          created="$(git ls-files --others --exclude-standard -- .shl/)"
+          if ! git diff --quiet HEAD -- .shl/ || [ -n "$created" ]; then
+            echo "::error::code run by the suite touched the loop's own tree; refusing to let it be judged by code it may have rewritten"
+            git diff --stat HEAD -- .shl/
+            [ -n "$created" ] && printf 'created: %s\n' "$created"
+            exit 1
+          fi
       - name: Gate — no weakening, frozen test + config untouched
         id: gate
         if: success() && steps.w.outputs.go == 'true' && steps.fix.outputs.escalated != 'true'

@@ -126,6 +126,53 @@ class TheGuardedPathIsOneThatActuallyExists(unittest.TestCase):
 
 
 
+def _loop_tree_half() -> str:
+    """The loop-tree half of the FIRST guard step, verbatim from the workflow.
+
+    Lifted rather than rebuilt. A reconstruction proves only that the lines the
+    test writes behave as expected: redirect the shipped `ls-files` call into
+    `/dev/null` and `$created` is empty on every cycle, yet a rebuilt copy still
+    catches the created file and a string search still finds both commands. Same
+    wrong-seam defect this project has shipped three times — testing the
+    predicate instead of the caller.
+    """
+    text = (WORKFLOWS / "heal.yml").read_text(encoding="utf-8")
+    # Bounded to the FIRST guard step, not searched for across the file. The
+    # command text is not a safe anchor: there are two guards now, so blinding
+    # this one made `index` skip to the second, both sides of the identity
+    # check below then matched, and a mutation that removed the creation query
+    # from the shipped guard passed. The step name is what identifies the step.
+    opener = "- name: Loop tree untouched — checked by git"
+    step_start = text.index(opener)
+    step_end = text.index("\n      - name: ", step_start + len(opener))
+    step = text[step_start:step_end]
+    assert "Loop tree untouched again" not in step, "the two guard steps were confused"
+
+    start = step.index(f'created="$(git ls-files --others --exclude-standard -- {LOOP_DIR}')
+    end = step.index("\n          fi\n", start) + len("\n          fi\n")
+    block = textwrap.dedent(step[step.rindex("\n", 0, start) + 1:end])
+    assert "exit 1" in block, "the lifted block carries no refusal"
+    return block
+
+
+def _installed_repo(tmp: str) -> Path:
+    """A throwaway repo shaped like an install: committed loop dir + its gitignore."""
+    repo = Path(tmp)
+    loop = repo / LOOP_DIR
+    loop.mkdir(parents=True)
+    (loop / ".gitignore").write_text(
+        "evidence/\n*.json\n!opencode.json\n*.txt\n*.diff\n*.raw\n__pycache__/\n*.pyc\n"
+    )
+    (loop / "loop.py").write_text("# vendored\n")
+    (repo / "src.py").write_text("# target source\n")
+    for cmd in (["git", "init", "-q", "."],
+                ["git", "add", "-A"],
+                ["git", "-c", "user.email=t@t", "-c", "user.name=t",
+                 "commit", "-qm", "install"]):
+        subprocess.run(cmd, cwd=repo, check=True, capture_output=True)
+    return repo
+
+
 class TheGuardSeesCreationAndNotOnlyModification(unittest.TestCase):
     """`git diff` reports modified TRACKED files, never untracked ones.
 
@@ -137,50 +184,19 @@ class TheGuardSeesCreationAndNotOnlyModification(unittest.TestCase):
     would be committed and run on every later cycle.
 
     Executed against a real repository rather than asserted against the YAML,
-    because the whole point is what git does, not what the file says.
-
-    The script under test is LIFTED FROM `heal.yml`, not rebuilt here. A
-    reconstruction proves only that the two lines this file writes behave as
-    expected: redirect the shipped `ls-files` call into `/dev/null` and
-    `$created` is empty on every cycle, yet a rebuilt copy still catches the
-    created file and the string search below still finds both commands. Same
-    wrong-seam defect this project has shipped three times — testing the
-    predicate instead of the caller.
+    because the whole point is what git does, not what the file says. The script
+    under test is lifted from `heal.yml` by `_loop_tree_half`, not rebuilt here.
     """
-
-    def _shipped_script(self) -> str:
-        """The loop-tree half of the guard step, verbatim from the workflow."""
-        text = (WORKFLOWS / "heal.yml").read_text(encoding="utf-8")
-        start = text.index(f'created="$(git ls-files --others --exclude-standard -- {LOOP_DIR}')
-        end = text.index("\n          fi\n", start) + len("\n          fi\n")
-        block = textwrap.dedent(text[text.rindex("\n", 0, start) + 1:end])
-        assert "exit 1" in block, "the lifted block carries no refusal"
-        return block
 
     def _guard(self, repo: Path) -> int:
         return subprocess.run(
-            ["bash", "-e"], input=self._shipped_script(), text=True,
+            ["bash", "-e"], input=_loop_tree_half(), text=True,
             capture_output=True, cwd=repo,
         ).returncode
 
-    def _repo(self, tmp: str) -> Path:
-        repo = Path(tmp)
-        loop = repo / LOOP_DIR
-        loop.mkdir(parents=True)
-        (loop / ".gitignore").write_text(
-            "evidence/\n*.json\n!opencode.json\n*.txt\n*.diff\n*.raw\n__pycache__/\n*.pyc\n"
-        )
-        (loop / "loop.py").write_text("# vendored\n")
-        for cmd in (["git", "init", "-q", "."],
-                    ["git", "add", "-A"],
-                    ["git", "-c", "user.email=t@t", "-c", "user.name=t",
-                     "commit", "-qm", "install"]):
-            subprocess.run(cmd, cwd=repo, check=True, capture_output=True)
-        return repo
-
     def test_ordinary_cycle_scratch_does_not_trip_it(self):
         with tempfile.TemporaryDirectory() as tmp:
-            repo = self._repo(tmp)
+            repo = _installed_repo(tmp)
             loop = repo / LOOP_DIR
             (loop / "evidence").mkdir()
             for scratch in ("signal.txt", "diagnose.json", "fix.diff", "suite_raw.raw"):
@@ -189,13 +205,13 @@ class TheGuardSeesCreationAndNotOnlyModification(unittest.TestCase):
 
     def test_a_created_source_file_is_caught(self):
         with tempfile.TemporaryDirectory() as tmp:
-            repo = self._repo(tmp)
+            repo = _installed_repo(tmp)
             (repo / LOOP_DIR / "sitecustomize.py").write_text("# executes at interpreter startup\n")
             self.assertEqual(self._guard(repo), 1, "a created .py under the loop dir went unreported")
 
     def test_a_modified_tracked_file_is_still_caught(self):
         with tempfile.TemporaryDirectory() as tmp:
-            repo = self._repo(tmp)
+            repo = _installed_repo(tmp)
             (repo / LOOP_DIR / "loop.py").write_text("# tampered\n")
             self.assertEqual(self._guard(repo), 1)
 
@@ -216,6 +232,151 @@ class TheGuardSeesCreationAndNotOnlyModification(unittest.TestCase):
                 "$created", line,
                 f"the refusal ignores created files, so a new .py walks past it: {line.strip()}",
             )
+
+
+class TheGuardRunsAgainAfterTheSuite(unittest.TestCase):
+    """The guard above runs before the last agent-authored code does.
+
+    `Green` and `Run suite` execute the repro test and the target's suite with a
+    full shell, and both come AFTER `Loop tree untouched` has already passed.
+    Every step below them starts an interpreter with `PYTHONPATH=.shl`, which
+    imports `.shl/sitecustomize.py` at startup before `-m guardrails.cli` loads
+    — `-B` disables bytecode, not `site`, and the vendored .gitignore covers
+    scratch, not `*.py`. So a repro test that plants that file at Green or `Run
+    suite` executes inside the gate that judges the fix, inside the commit and
+    the verdict comment that carry the write credential, and inside the review
+    that carries the provider credential. Nothing between it and them looks.
+
+    ONLY the git-only half repeats, and that is what makes a second instance
+    safe. `git diff --quiet HEAD` and `git ls-files --others` are both fresh
+    queries against the working tree with no baseline, so a second instance
+    cannot disagree with an earlier measurement. The execution-surface hash
+    compares a value across a step boundary; that shape is what once made this
+    guard refuse every cycle on every repo, so it stays where it is.
+    """
+
+    # The em dash discriminates: the first guard is "Loop tree untouched —",
+    # this one "Loop tree untouched again", so neither prefix matches both.
+    PREFIX = "Loop tree untouched again"
+    FIRST = "Loop tree untouched —"
+
+    def _step(self, prefix: str | None = None) -> dict:
+        prefix = prefix or self.PREFIX
+        text = (WORKFLOWS / "heal.yml").read_text(encoding="utf-8")
+        for chunk in re.split(r"^ {6}- (?=name:)", text, flags=re.MULTILINE)[1:]:
+            name = re.match(r"name: (.+)", chunk)
+            if not name or not name.group(1).strip().startswith(prefix):
+                continue
+            body = re.search(r"^ {8}run: \|\s*\n(.*?)(?=^ {6,8}\S|\Z)", chunk, re.M | re.S)
+            cond = re.search(r"^ {8}if: (.+)$", chunk, flags=re.MULTILINE)
+            self.assertIsNotNone(body, f"{name.group(1).strip()!r} has no run body")
+            return {
+                "name": name.group(1).strip(),
+                "run": textwrap.dedent(body.group(1)),
+                "cond": cond.group(1) if cond else "",
+            }
+        raise AssertionError(
+            f"heal.yml has no step named {prefix!r}: nothing re-checks the loop "
+            "tree between the suite and the steps that hold a credential"
+        )
+
+    def _names(self) -> list:
+        text = (WORKFLOWS / "heal.yml").read_text(encoding="utf-8")
+        return re.findall(r"^ {6}- (?:name|uses): (.+?)\s*$", text, re.MULTILINE)
+
+    def test_it_sits_after_the_last_agent_code_and_before_the_gate(self):
+        # Position is the whole control. Before `Run suite` it is the step
+        # already there; after `Gate` the interpreter that judges the fix has
+        # already imported whatever was planted.
+        names = self._names()
+        here = names.index(self._step()["name"])
+        self.assertGreater(here, names.index("Run suite"))
+        self.assertLess(here, next(i for i, n in enumerate(names) if n.startswith("Gate")))
+
+    def test_it_runs_on_every_cycle_the_first_guard_does(self):
+        # An `if:` can retire a step in place while every other check here still
+        # passes on a body it no longer runs. Pinned to the first guard's
+        # condition, which `test_workflows.py` in turn pins to the step that
+        # commits — so the two instances cannot diverge on reachability.
+        self.assertEqual(self._step()["cond"], self._step(self.FIRST)["cond"])
+
+    def test_it_does_not_repeat_the_cross_step_comparison(self):
+        """The reason this step is safe to add, asserted rather than described.
+
+        Hashing git's execution surface here would compare a value against an
+        output published by an earlier step. That is the shape that once made
+        this guard refuse every cycle on every repo, unconditionally, with a
+        green suite — so a second instance must carry no Actions expression and
+        no snapshot at all, only the two self-contained git queries.
+        """
+        run = self._step()["run"]
+        for forbidden in ("git-exec-surface", "git_surface", "sha256sum", "${{"):
+            self.assertNotIn(
+                forbidden, run,
+                f"the second guard carries {forbidden!r}, so its verdict depends on "
+                "something measured in another step",
+            )
+
+    def test_its_commands_are_the_shipped_ones(self):
+        # Two copies of a check that drift are one check and one decoration.
+        # The `::error::` line is exempt: it names which agent-authored code is
+        # under suspicion, and at this position that is the suite, not the fix.
+        def commands(block: str) -> list:
+            return [ln for ln in block.strip().splitlines() if "::error::" not in ln]
+
+        self.assertEqual(commands(self._step()["run"]), commands(_loop_tree_half()))
+
+    def _run(self, repo: Path) -> int:
+        return subprocess.run(
+            ["bash", "-e"], input=self._step()["run"], text=True,
+            capture_output=True, cwd=repo,
+        ).returncode
+
+    def _after_a_cycle(self, tmp: str) -> Path:
+        """A repo as `Run suite` leaves it: everything a real cycle has by then.
+
+        Fix's own output is part of that and is the reason both commands carry a
+        `.shl/` pathspec: an edited source file and a newly written regression
+        test are present on every healthy cycle, so a guard that looked at the
+        whole tree would refuse all of them.
+        """
+        repo = _installed_repo(tmp)
+        (repo / "src.py").write_text("# fixed by the loop\n")
+        (repo / "tests").mkdir()
+        (repo / "tests" / "test_repro.py").write_text("def test_x():\n    assert True\n")
+        loop = repo / LOOP_DIR
+        (loop / "frozen_path.txt").write_text("tests/test_repro.py")
+        (loop / "suite_raw.txt").write_text("1 failed, 40 passed\n")
+        (loop / "current_raw.txt").write_text("tests/test_repro.py::test_x\n")
+        evidence = loop / "evidence" / "c1"
+        evidence.mkdir(parents=True)
+        (evidence / "suite.txt").write_text("scrubbed\n")
+        (evidence / "current_failures.txt").write_text("scrubbed\n")
+        return repo
+
+    def test_ordinary_cycle_scratch_does_not_trip_it(self):
+        """The assertion that decides whether this step is a fix or a regression.
+
+        A guard that refuses on the files `Run suite` legitimately leaves would
+        block every cycle on every repo while looking like a working check —
+        which is exactly what the last change to this guard did.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = self._after_a_cycle(tmp)
+            self.assertEqual(self._run(repo), 0, "the second guard refuses a normal cycle")
+
+    def test_a_test_that_plants_sitecustomize_at_green_is_caught(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = self._after_a_cycle(tmp)
+            (repo / LOOP_DIR / "sitecustomize.py").write_text(
+                "# imported by every PYTHONPATH=.shl step below this one\n"
+            )
+            self.assertEqual(
+                self._run(repo), 1,
+                "a file planted after the first guard reaches the gate and both "
+                "credentialed steps unreported",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
