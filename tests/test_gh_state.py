@@ -157,13 +157,15 @@ class TheMarkerSurvivesCommasAndHostilePaths(unittest.TestCase):
         self.assertEqual(fingerprint_marker([]), "<!-- shl-fingerprint:  -->")
 
 
-class TheDedupWindowAndCapDefaultsArePinned(unittest.TestCase):
-    """Two bounds nothing behavioural pinned: the listing window and the cap.
+class TheDedupListingWindowIsPinned(unittest.TestCase):
+    """The bound nothing behavioural pinned: how many open issues dedup reads.
 
-    `--limit 100` was a string in the source with a comment; changing it to 30
-    or 1000 passed the suite either way, and only a doc-sync test noticed a cap
-    change. Both are behaviour an operator depends on, so both get a test that
-    drives the real function with a stub `gh`.
+    `--limit 100` was a string in the source with a comment, so changing it to
+    30 or 1000 passed the suite either way. It is behaviour an operator depends
+    on, so it gets a test driving the real function with a stub `gh`. The other
+    two bounds are pinned elsewhere: the marker cap by
+    `TheMarkerIsBoundedSoTheIssueCanBeFiled` below, and the attempt cap by
+    `tests/test_loop.py`, which calls `under_attempt_cap` with its default.
     """
 
     def _runner(self, bodies):
@@ -183,62 +185,6 @@ class TheDedupWindowAndCapDefaultsArePinned(unittest.TestCase):
             any("--limit 100" in j for j in joined),
             f"the dedup window changed: {joined}",
         )
-
-class TheMarkerSurvivesCommasAndHostilePaths(unittest.TestCase):
-    """The marker is the dedup key, and it is built from LOG-derived strings.
-
-    Two defects shared one root: the marker joined fingerprints with a comma,
-    and a fingerprint is `Type@path:line` where the path comes from the log —
-    so a path carrying a comma split into two wrong fingerprints and dedup
-    missed forever, and a path carrying `-->` closed the HTML comment early and
-    injected attacker-chosen text into the issue body, the one GitHub surface
-    the marker reaches without passing the scrubber.
-
-    Both are closed by encoding rather than by escaping: the payload is JSON in
-    urlsafe base64, whose alphabet contains neither a comma nor a `-` followed
-    by `>`. Round-trip through the same function the workflow greps with.
-    """
-
-    def test_a_comma_in_a_path_does_not_split_the_fingerprint(self):
-        from gh_state import _marked_fingerprints
-
-        fps = ["KeyError@data, rough/x.py:12", "ValueError@app/y.py:3"]
-        decoded = _marked_fingerprints("prose\n" + fingerprint_marker(fps) + "\n")
-        self.assertEqual(decoded, set(fps))
-
-    def test_a_path_cannot_close_the_comment_and_inject(self):
-        from gh_state import _marked_fingerprints
-
-        hostile = 'KeyError@x --> <script>alert(1)</script>:1'
-        marker = fingerprint_marker([hostile])
-        # The comment closes exactly once, where the function put it: a second
-        # `-->` anywhere earlier would end the comment and render the rest as
-        # body text, which is the injection.
-        self.assertEqual(marker.count("-->"), 1)
-        self.assertTrue(marker.endswith("-->"))
-        self.assertEqual(_marked_fingerprints(marker), {hostile})
-
-    def test_an_order_change_does_not_change_the_marker(self):
-        self.assertEqual(
-            fingerprint_marker(["b@x:1", "a@y:2"]),
-            fingerprint_marker(["a@y:2", "b@x:1"]),
-        )
-
-    def test_a_legacy_comma_joined_marker_still_parses(self):
-        # Issues filed before the encoding carry the old form; a target that
-        # updates mid-flight must still recognise them or it re-files a duplicate
-        # for every failure it has already seen.
-        from gh_state import _marked_fingerprints
-
-        self.assertEqual(
-            _marked_fingerprints("<!-- shl-fingerprint: A@x:1,B@y:2 -->"),
-            {"A@x:1", "B@y:2"},
-        )
-
-    def test_the_empty_marker_keeps_its_bare_shape(self):
-        # The workflow greps this shape when refusing an unfingerprintable log;
-        # changing the empty form silently breaks that path.
-        self.assertEqual(fingerprint_marker([]), "<!-- shl-fingerprint:  -->")
 
 
 class AgentWrittenProseCannotHijackTheDedupKey(unittest.TestCase):

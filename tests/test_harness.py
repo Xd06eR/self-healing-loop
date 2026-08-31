@@ -147,7 +147,7 @@ class RestrictionsMatchTheDocumentedCIMode(unittest.TestCase):
         `Edit,Write,NotebookEdit` beside it — and those three sit outside
         `required_denial`, so the guard that exists to prove a role is
         restricted never looked at them. Deleting the whole read-only write
-        denial passed all 521 tests.
+        denial passed the entire suite.
 
         The membership is computed from `--add-dir`, not listed: a fourth role
         granted the target's source later inherits the requirement instead of

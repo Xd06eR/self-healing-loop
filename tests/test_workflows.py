@@ -820,7 +820,7 @@ class TheMergeEscalationAsksWhetherTheMergeHAPPENED(unittest.TestCase):
         Written above `gh pr merge`, it claims a merge that the very next line
         may fail to perform — and everything downstream keyed on it (the
         escalation, the rollback's reason for existing) then fires on a PR that
-        is still open. Moving the line up left all 553 tests green, because
+        is still open. Moving the line up left the whole suite green, because
         every assertion here searched for the string rather than its position.
         """
         body = next(s for s in job_steps("heal.yml") if s["name"] == "Merge")["body"]
