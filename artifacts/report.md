@@ -67,7 +67,7 @@ Follow `SETUP.md` § *Before going live*, which owns those steps; nothing in thi
 
 ## Residual risks
 
-Boundaries of the design, not bugs awaiting a fix. Full text in `.shl/SETUP.md`; the short form:
+Boundaries of the design, not bugs awaiting a fix. **`SETUP.md` owns this list**; these four are the ones that bite most often, repeated here because whoever reads this report months from now may not be the person who ran the install. Change them there, not here.
 
 - the merge gate compares lines, not meaning;
 - red-then-green only covers failures that reduce to a test;
