@@ -11,8 +11,6 @@ Installs the loop into the repo this skill runs in. After install, a GitHub Acti
 
 ## Rules that govern every phase
 
-**Self-contained.** This skill invokes no other skill. It installs onto machines whose skill set it cannot predict, so a dependency on another skill is one that will be missing. Use a skill from the operator's own environment only when one is present and clearly fits; never require one.
-
 **The visibility rule** decides what you may determine and what you must ask:
 
 > A fact may be **determined** only if getting it wrong would be **visible**. If a wrong answer is indistinguishable from a correct one, it is **asked**, however strong the evidence looks.
